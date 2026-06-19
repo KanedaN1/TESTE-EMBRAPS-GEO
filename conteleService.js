@@ -84,6 +84,7 @@ class ConteleService {
         else if (data.pois) poisList = data.pois;
 
         return poisList
+            .filter(p => p.status !== 'deleted' && p.status !== 'inactive') // Remove postos antigos/excluídos
             .filter(p => (p.lat && p.lng) || (p.address && p.address.location && p.address.location.latitude)) // Só locais posicionados
             .map(p => {
                 const latitude = p.lat || (p.address && p.address.location ? p.address.location.latitude : 0);
