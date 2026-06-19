@@ -25,25 +25,18 @@ class AIOperationalAnalyst {
         const posts = await DatabaseService.getPosts();
         const incidents = await DatabaseService.getIncidents();
         const supervisors = await DatabaseService.getSupervisores();
-        
-        // Verifica se há chave da API do Gemini configurada
-        const apiKey = localStorage.getItem('gemini_api_key');
-        if (apiKey && apiKey.trim() !== "") {
-            try {
-                return await this._callGeminiAPI(queryText, apiKey, posts, incidents, supervisors);
-            } catch (e) {
-                console.error("Erro na chamada Gemini API:", e);
-                const localResponse = await this._localProcess(this._normalize(queryText), posts, incidents, supervisors);
-                return `> [!WARNING]
+            // Envia a requisição para a nossa Serverless Function na Vercel (onde a chave está escondida)
+        try {
+            return await this._callGeminiAPI(queryText, posts, incidents, supervisors);
+        } catch (e) {
+            console.error("Erro na chamada Gemini API (via Vercel Proxy):", e);
+            const localResponse = await this._localProcess(this._normalize(queryText), posts, incidents, supervisors, queryText);
+            return `> [!WARNING]
 > **Erro na IA Gemini**: ${e.message}.
 > Operando temporariamente no modo analista local off-line.
 
 ${localResponse}`;
-            }
         }
-        
-        // Ensure raw query is passed to _localProcess for NLP parsing
-        return this._localProcess(this._normalize(queryText), posts, incidents, supervisors, queryText);
     }
 
     // Processador de Regras Local (Offline)
@@ -254,8 +247,8 @@ ${topPostosDemissao.map(p => \`* **\${p[0]}**: \${p[1]} desligamentos/vagas.\`).
         return report;
     }
 
-    // Faz a chamada assíncrona direta para a Gemini API do Google
-    static async _callGeminiAPI(queryText, apiKey, posts, incidents, supervisors) {
+    // Faz a chamada assíncrona para o proxy da Vercel (que fala com o Gemini)
+    static async _callGeminiAPI(queryText, posts, incidents, supervisors) {
         const cleanPosts = posts.map(p => {
             const dSup = supervisors.find(s => s.id === p.daySupervisorId);
             const nSup = supervisors.find(s => s.id === p.nightSupervisorId);
@@ -321,7 +314,7 @@ ${JSON.stringify(databaseContext, null, 2)}
 PERGUNTA OPERACIONAL:
 "${queryText}"`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch('/api/gemini', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -345,7 +338,7 @@ PERGUNTA OPERACIONAL:
 
         if (!response.ok) {
             const err = await response.json();
-            throw new Error(err.error?.message || `Erro HTTP ${response.status}`);
+            throw new Error(err.error || `Erro HTTP ${response.status}`);
         }
 
         const data = await response.json();
