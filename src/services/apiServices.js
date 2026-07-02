@@ -2,14 +2,46 @@ import axios from 'axios';
 
 const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY;
 const conteleToken = import.meta.env.VITE_CONTELE_TOKEN;
+const conteleApiKey = import.meta.env.VITE_CONTELE_API_KEY;
 
 // Busca postos reais na API do Contele
 export const fetchContelePlaces = async () => {
   try {
-    const response = await axios.get('/api-contele/v1/places', {
-      headers: { Authorization: conteleToken }
+    const response = await axios.get('/api-contele/pois?perPage=1000', {
+      headers: { 
+        Authorization: conteleToken,
+        'x-api-key': conteleApiKey
+      }
     });
-    return response.data;
+    
+    let data = response.data;
+    let poisList = [];
+    if (Array.isArray(data)) poisList = data;
+    else if (data.data) poisList = data.data;
+    else if (data.pois) poisList = data.pois;
+
+    return poisList
+      .filter(p => p.status !== 'deleted' && p.status !== 'inactive')
+      .filter(p => (p.lat && p.lng) || (p.address && p.address.location && p.address.location.latitude))
+      .map(p => {
+        const latitude = p.lat || (p.address && p.address.location ? p.address.location.latitude : 0);
+        const longitude = p.lng || (p.address && p.address.location ? p.address.location.longitude : 0);
+        const bairroStr = (p.address && p.address.neighborhood) ? p.address.neighborhood : (p.neighborhood || p.district || p.city || 'Desconhecido');
+        
+        return {
+          id: String(p.id || p.customId),
+          nome: p.name || p.corporateName || p.fantasyName || 'Posto Sem Nome',
+          bairro: bairroStr,
+          lat: parseFloat(latitude),
+          lng: parseFloat(longitude),
+          isDayOnly: false,
+          isNightOnly: false,
+          hasComporta: false,
+          daySupervisorId: null,
+          nightSupervisorId: null,
+          source: 'contele'
+        };
+      });
   } catch (error) {
     console.error('Erro ao buscar Contele Places API:', error);
     return null;
@@ -19,10 +51,30 @@ export const fetchContelePlaces = async () => {
 // Busca usuários (supervisores) reais na API do Contele
 export const fetchConteleUsers = async () => {
   try {
-    const response = await axios.get('/api-contele/v1/users', {
-      headers: { Authorization: conteleToken }
+    const response = await axios.get('/api-contele/users?perPage=500', {
+      headers: { 
+        Authorization: conteleToken,
+        'x-api-key': conteleApiKey
+      }
     });
-    return response.data;
+
+    let data = response.data;
+    let usersList = [];
+    if (Array.isArray(data)) usersList = data;
+    else if (data.data) usersList = data.data;
+    else if (data.users) usersList = data.users;
+
+    return usersList.map((u, index) => {
+      const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e'];
+      const cor = colors[index % colors.length];
+
+      return {
+        id: String(u.id || u.customId || u.userId || u.name),
+        nome: u.name || u.firstName || 'Supervisor Sem Nome',
+        turno: 'diurno', 
+        cor: cor
+      };
+    });
   } catch (error) {
     console.error('Erro ao buscar Contele Users API:', error);
     return null;

@@ -57,8 +57,8 @@ export default function SidebarChat({ contextData }) {
       <div className="chat-window">
         {messages.map(msg => (
           <div key={msg.id} className={`chat-message ${msg.type}`}>
-            {msg.type === 'ai' && <Bot size={14} style={{marginBottom:'4px', display:'block'}} />}
-            {msg.text}
+            {msg.type === 'ai' && <Bot size={16} style={{ flexShrink: 0, marginTop: '2px' }} />}
+            <span>{msg.text}</span>
           </div>
         ))}
         {loading && (

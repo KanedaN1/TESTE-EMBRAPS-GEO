@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api-contele': {
-        target: 'https://api.conteleequipes.com.br',
+        target: 'https://integration.contelege.com.br/v2',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api-contele/, ''),
       },
