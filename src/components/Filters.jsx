@@ -1,0 +1,95 @@
+import React, { useState } from 'react';
+import { Filter, Map as MapIcon, Route, Plus, Edit, Users, Car } from 'lucide-react';
+
+export default function Filters({ 
+  onFilterChange, 
+  onToggleHeatmap, 
+  heatmapActive,
+  onToggleSupervisorRoute,
+  routeActive,
+  onSimulateTraffic,
+  onAddPosto,
+  onOpenSupervisors,
+  supervisores = []
+}) {
+  const [filterState, setFilterState] = useState({
+    nome: '',
+    supervisor: '',
+    bairro: '',
+    status: ''
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    const newFilters = { ...filterState, [name]: value };
+    setFilterState(newFilters);
+    onFilterChange(newFilters);
+  };
+
+  return (
+    <div className="filters-bar glass-panel animate-fade-in" style={{ animationDelay: '0.1s' }}>
+      <Filter size={20} color="var(--primary-blue)" />
+      
+      <input 
+        type="text" 
+        name="nome" 
+        placeholder="Nome do Posto" 
+        className="filter-input"
+        value={filterState.nome}
+        onChange={handleChange}
+      />
+      <select 
+        name="supervisor" 
+        className="filter-input"
+        value={filterState.supervisor}
+        onChange={handleChange}
+      >
+        <option value="">Supervisor (Todos)</option>
+        {supervisores.map(sup => {
+          const nome = sup.name || sup.firstName || '';
+          return (
+            <option key={sup.id} value={nome}>{nome}</option>
+          );
+        })}
+      </select>
+      <input 
+        type="text" 
+        name="bairro" 
+        placeholder="Bairro" 
+        className="filter-input"
+        value={filterState.bairro}
+        onChange={handleChange}
+      />
+      
+      <select name="status" className="filter-input" value={filterState.status} onChange={handleChange}>
+        <option value="">Status (Todos)</option>
+        <option value="Operacional">Operacional (Verde)</option>
+        <option value="Alerta">Alerta (Vermelho)</option>
+        <option value="Clima">Clima (Azul)</option>
+      </select>
+
+      <div style={{ width: '1px', height: '24px', background: 'rgba(59,130,246,0.3)', margin: '0 8px' }}></div>
+
+      <button className={`action-btn ${heatmapActive ? 'active' : ''}`} onClick={onToggleHeatmap}>
+        <MapIcon size={16} /> Mapa de Calor
+      </button>
+      
+      <button className={`action-btn ${routeActive ? 'active' : ''}`} onClick={onToggleSupervisorRoute}>
+        <Route size={16} /> Rotas (Sup.)
+      </button>
+
+      <button className="action-btn" onClick={onSimulateTraffic} title="Simular engarrafamentos (TomTom API)">
+        <Car size={16} /> Trânsito (TomTom)
+      </button>
+
+      <div style={{ flex: 1 }}></div>
+
+      <button className="action-btn" onClick={onAddPosto}>
+        <Plus size={16} /> Adicionar
+      </button>
+      <button className="action-btn" onClick={onOpenSupervisors}>
+        <Users size={16} /> Supervisores
+      </button>
+    </div>
+  );
+}
