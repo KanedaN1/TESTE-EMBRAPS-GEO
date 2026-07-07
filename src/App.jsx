@@ -34,6 +34,7 @@ function App() {
   // Form states
   const [newPosto, setNewPosto] = useState({ nome: '', address: '', comporta: false, supervisor: '', telefone: '' });
   const [newSup, setNewSup] = useState({ nome: '', turno: 'Diurno' });
+  const [expandedSupId, setExpandedSupId] = useState(null);
 
   // Check APIs on mount
   useEffect(() => {
@@ -149,7 +150,7 @@ function App() {
     
     setLoadingRoute(true);
     // Ponto de Partida: Embraps
-    const embrapsCoord = await geocodeAddress("Praça Coronel Fernando Prestes 18, Macuco, Santos, SP");
+    const embrapsCoord = await geocodeAddress("Praça Cel. Fernando Prestes, 18 - Macuco, Santos - SP, 11020-010");
     const startPoint = embrapsCoord || { lat: -23.9608, lng: -46.3336 }; 
     
     // Filtra postos visíveis para a rota
@@ -295,13 +296,29 @@ function App() {
                   const postosResp = enrichedPostos.filter(p => p.supervisorDiurno === nome || p.supervisorNoturno === nome).length;
                   const isCustom = customSupervisores.some(cs => cs.id === u.id);
                   return (
-                    <li key={u.id} style={{padding:'8px', borderBottom:'1px solid rgba(0,0,0,0.1)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                      <div>
-                        <strong>{nome}</strong> ({u.turno || u.role || 'Geral'}) <br/>
-                        <small>{postosResp} postos atribuídos</small>
+                    <li key={u.id} style={{padding:'8px', borderBottom:'1px solid rgba(0,0,0,0.1)', display:'flex', flexDirection:'column'}}>
+                      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', cursor: 'pointer'}} onClick={() => setExpandedSupId(expandedSupId === u.id ? null : u.id)}>
+                        <div>
+                          <strong>{nome}</strong> ({u.turno || u.role || 'Geral'}) <br/>
+                          <small style={{color:'var(--primary-blue)'}}>{postosResp} postos atribuídos (clique para ver)</small>
+                        </div>
+                        {isCustom && (
+                          <button className="action-btn" style={{color:'var(--danger)', borderColor:'var(--danger)'}} onClick={(e) => { e.stopPropagation(); handleDeleteSup(u.id); }}>Excluir</button>
+                        )}
                       </div>
-                      {isCustom && (
-                        <button className="action-btn" style={{color:'var(--danger)', borderColor:'var(--danger)'}} onClick={() => handleDeleteSup(u.id)}>Excluir</button>
+                      
+                      {expandedSupId === u.id && (
+                        <div style={{marginTop: '8px', padding: '8px', background: 'rgba(59,130,246,0.1)', borderRadius: '8px', color: 'var(--text-dark)'}}>
+                          {postosResp > 0 ? (
+                            <ul style={{listStyle:'disc', paddingLeft:'20px', fontSize:'0.85rem'}}>
+                              {enrichedPostos.filter(p => p.supervisorDiurno === nome || p.supervisorNoturno === nome).map(p => (
+                                <li key={p.id}>{p.nome} - {p.bairro}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span style={{fontSize:'0.85rem', color:'var(--text-light)'}}>Nenhum posto atribuído a este supervisor.</span>
+                          )}
+                        </div>
                       )}
                     </li>
                   )

@@ -10,6 +10,7 @@ export const fetchContelePlaces = async () => {
     const response = await axios.get('/api-contele/pois?perPage=1000', {
       headers: { 
         Authorization: conteleToken,
+        'auth-token': conteleToken ? conteleToken.replace('Bearer ', '') : '',
         'x-api-key': conteleApiKey
       }
     });
@@ -54,6 +55,7 @@ export const fetchConteleUsers = async () => {
     const response = await axios.get('/api-contele/users?perPage=500', {
       headers: { 
         Authorization: conteleToken,
+        'auth-token': conteleToken ? conteleToken.replace('Bearer ', '') : '',
         'x-api-key': conteleApiKey
       }
     });
