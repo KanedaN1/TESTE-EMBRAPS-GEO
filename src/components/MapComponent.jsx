@@ -60,11 +60,11 @@ function HeatmapLayer({ data, active }) {
   return null;
 }
 
-export default function MapComponent({ postos, heatmapActive, routeActive, trafficActive, weatherActive }) {
+export default function MapComponent({ postos, heatmapActive, routeActive, tomTomRouteCoords, trafficActive, weatherActive }) {
   const baixadaSantista = [-23.9608, -46.3336]; // Santos center
 
-  // Supervisor routing logic (connects all visible points)
-  const routePositions = routeActive ? postos.map(p => [p.lat, p.lng]) : [];
+  // Supervisor routing logic
+  const routePositions = routeActive && tomTomRouteCoords ? tomTomRouteCoords : [];
 
   return (
     <div className="map-container glass-panel animate-fade-in" style={{ animationDelay: '0.3s' }}>
@@ -77,11 +77,20 @@ export default function MapComponent({ postos, heatmapActive, routeActive, traff
 
         {/* Traffic Simulation Layer (TomTom) */}
         {trafficActive && (
-          <TileLayer
-             url="https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=xy4ApeHYbU4NZ11HyiiWkFxFHJuvWYsN"
-             opacity={0.7}
-             zIndex={10}
-          />
+          <>
+            {/* Fluxo de Trânsito */}
+            <TileLayer
+               url="https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=xy4ApeHYbU4NZ11HyiiWkFxFHJuvWYsN"
+               opacity={0.7}
+               zIndex={10}
+            />
+            {/* Incidentes de Trânsito */}
+            <TileLayer
+               url="https://api.tomtom.com/traffic/map/4/tile/incidents/s3/{z}/{x}/{y}.png?key=xy4ApeHYbU4NZ11HyiiWkFxFHJuvWYsN"
+               opacity={1}
+               zIndex={11}
+            />
+          </>
         )}
 
         <HeatmapLayer data={postos} active={heatmapActive} />
@@ -102,6 +111,7 @@ export default function MapComponent({ postos, heatmapActive, routeActive, traff
                   <h3>{posto.nome}</h3>
                   <p><strong>Bairro:</strong> {posto.bairro}</p>
                   <p><strong>Turno:</strong> {posto.turno}</p>
+                  <p><strong>Telefone:</strong> {posto.telefone || 'Não informado'}</p>
                   <p><strong>Sup. Diurno:</strong> {posto.supervisorDiurno}</p>
                   <p><strong>Sup. Noturno:</strong> {posto.supervisorNoturno}</p>
                   <p><strong>Comporta:</strong> {posto.comporta ? 'Sim' : 'Não'}</p>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Filter, Map as MapIcon, Route, Plus, Edit, Users, Car } from 'lucide-react';
+import { Filter, Map as MapIcon, Route, Plus, Edit, Users, Car, Printer } from 'lucide-react';
 
 export default function Filters({ 
   onFilterChange, 
@@ -10,7 +10,9 @@ export default function Filters({
   onSimulateTraffic,
   onAddPosto,
   onOpenSupervisors,
-  supervisores = []
+  onPrint,
+  supervisores = [],
+  loadingRoute = false
 }) {
   const [filterState, setFilterState] = useState({
     nome: '',
@@ -74,8 +76,8 @@ export default function Filters({
         <MapIcon size={16} /> Mapa de Calor
       </button>
       
-      <button className={`action-btn ${routeActive ? 'active' : ''}`} onClick={onToggleSupervisorRoute}>
-        <Route size={16} /> Rotas (Sup.)
+      <button className={`action-btn ${routeActive ? 'active' : ''}`} onClick={onToggleSupervisorRoute} disabled={loadingRoute}>
+        <Route size={16} /> {loadingRoute ? 'Calculando...' : 'Rota Inteligente'}
       </button>
 
       <button className="action-btn" onClick={onSimulateTraffic} title="Simular engarrafamentos (TomTom API)">
@@ -89,6 +91,9 @@ export default function Filters({
       </button>
       <button className="action-btn" onClick={onOpenSupervisors}>
         <Users size={16} /> Supervisores
+      </button>
+      <button className="action-btn" onClick={onPrint} title="Imprimir escalas em PDF/A4">
+        <Printer size={16} /> Imprimir
       </button>
     </div>
   );

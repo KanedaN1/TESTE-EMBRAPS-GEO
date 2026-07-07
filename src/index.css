@@ -348,3 +348,86 @@ body {
   background: rgba(59, 130, 246, 0.2);
   color: var(--secondary-blue);
 }
+
+/* ============================ */
+/* Print Styles                 */
+/* ============================ */
+.print-only {
+  display: none;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-only {
+    display: block !important;
+  }
+  
+  body, html {
+    background: white !important;
+    color: black !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+  
+  .print-container {
+    width: 100%;
+    padding: 0;
+  }
+  
+  .print-page {
+    page-break-after: always;
+    padding: 2cm;
+    box-sizing: border-box;
+  }
+  
+  .print-page:last-child {
+    page-break-after: avoid;
+  }
+
+  .print-header {
+    margin-bottom: 30px;
+    text-align: center;
+  }
+  
+  .print-header h2 {
+    color: black;
+    font-size: 24px;
+    margin-bottom: 10px;
+  }
+
+  .print-header p {
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 15px;
+  }
+
+  .print-postos-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  .print-posto-card {
+    border: 1px solid #aaa;
+    padding: 15px;
+    border-radius: 8px;
+    background: white;
+    page-break-inside: avoid;
+  }
+  
+  .print-posto-card h3 {
+    margin-bottom: 10px;
+    font-size: 18px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+  }
+  
+  .print-posto-card p {
+    margin-bottom: 5px;
+    font-size: 14px;
+  }
+}

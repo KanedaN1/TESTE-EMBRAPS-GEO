@@ -43,8 +43,8 @@ export const fetchContelePlaces = async () => {
         };
       });
   } catch (error) {
-    console.error('Erro ao buscar Contele Places API:', error);
-    return null;
+    console.warn('Aviso: Erro ao buscar Contele Places API. Verifique credenciais no .env. Usando mockData fallback.', error);
+    return [];
   }
 };
 
@@ -76,8 +76,8 @@ export const fetchConteleUsers = async () => {
       };
     });
   } catch (error) {
-    console.error('Erro ao buscar Contele Users API:', error);
-    return null;
+    console.warn('Aviso: Erro ao buscar Contele Users API. Verifique credenciais no .env. Usando mockData fallback.', error);
+    return [];
   }
 };
 
@@ -100,16 +100,68 @@ ${JSON.stringify(contextData).substring(0, 1500)} // Truncado para limite
 O usuário pediu o seguinte: "${command}"
 Responda de forma clara, profissional, focada em segurança e operação. Máx 3 parágrafos.`;
 
-    const response = await axios.post(
-      `/api-gemini/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+    // Chamada direta para evitar CORS e problemas de Proxy
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
       {
-        contents: [{ parts: [{ text: prompt }] }]
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
       }
     );
     
-    return response.data.candidates[0].content.parts[0].text;
+    if (!response.ok) {
+      throw new Error(`Erro na API Gemini: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
   } catch (error) {
     console.error('Erro na IA:', error);
     return 'Desculpe, ocorreu um erro ao processar o comando via IA (Falha de Comunicação ou CORS).';
+  }
+};
+
+// =======================
+// TOMTOM API SERVICES
+// =======================
+const TOMTOM_API_KEY = 'xy4ApeHYbU4NZ11HyiiWkFxFHJuvWYsN';
+
+// Busca latitude e longitude baseada no endereço
+export const geocodeAddress = async (address) => {
+  try {
+    const response = await axios.get(`https://api.tomtom.com/search/2/geocode/${encodeURIComponent(address)}.json?key=${TOMTOM_API_KEY}&limit=1&countrySet=BR`);
+    if (response.data && response.data.results && response.data.results.length > 0) {
+      const position = response.data.results[0].position;
+      return { lat: position.lat, lng: position.lon };
+    }
+    return null;
+  } catch (error) {
+    console.error('Erro ao buscar geolocalização no TomTom:', error);
+    return null;
+  }
+};
+
+// Calcula rota em tempo real otimizada (evitando trânsito) passando por múltiplos pontos
+export const getTomTomRoute = async (points) => {
+  // points é um array de {lat, lng}
+  if (!points || points.length < 2) return null;
+  
+  const waypoints = points.map(p => `${p.lat},${p.lng}`).join(':');
+  
+  try {
+    const response = await axios.get(`https://api.tomtom.com/routing/1/calculateRoute/${waypoints}/json?key=${TOMTOM_API_KEY}&routeType=fastest&traffic=true&travelMode=car`);
+    if (response.data && response.data.routes && response.data.routes.length > 0) {
+      const routePoints = response.data.routes[0].legs.flatMap(leg => leg.points.map(p => [p.latitude, p.longitude]));
+      return routePoints;
+    }
+    return null;
+  } catch (error) {
+    console.error('Erro ao calcular rota no TomTom:', error);
+    return null;
   }
 };

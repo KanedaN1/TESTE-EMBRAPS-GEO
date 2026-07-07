@@ -15,18 +15,37 @@ export default function SidebarChat({ contextData }) {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Cron / Interação Mock (A cada "4 horas" ou ao iniciar, avisa sobre clima)
+  const contextRef = useRef(contextData);
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const msg = {
-        id: Date.now(),
-        type: 'ai',
-        text: '⚠️ Alerta Automático (CRON 4h): Previsão de chuvas fortes na Baixada Santista amanhã a partir das 15h. Recomendo checar os postos com comporta!'
-      };
-      setMessages(prev => [...prev, msg]);
-    }, 15000); // 15s para simular na demo
+    contextRef.current = contextData;
+  }, [contextData]);
 
-    return () => clearTimeout(timer);
+  // Alerta Automático a cada 2 horas (e um inicial em 15s para demonstração)
+  useEffect(() => {
+    const checkWeather = async () => {
+      try {
+        const aiResponse = await processAICommand(
+          'Analise a previsão do tempo para as próximas 24h na Baixada Santista e faça um alerta rápido recomendando verificar os postos com comporta se houver chuva.', 
+          contextRef.current
+        );
+        const msg = {
+          id: Date.now(),
+          type: 'ai',
+          text: `⚠️ Alerta Automático (Clima 2h): ${aiResponse}`
+        };
+        setMessages(prev => [...prev, msg]);
+      } catch(e) {
+        console.error(e);
+      }
+    };
+
+    const initialTimer = setTimeout(checkWeather, 15000); // Demo inicial
+    const interval = setInterval(checkWeather, 7200000); // 2 horas
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleSend = async (e) => {
