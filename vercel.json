@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api-contele/:path*",
+      "destination": "https://integration.contelege.com.br/v2/:path*"
+    },
+    {
+      "source": "/api-gemini/:path*",
+      "destination": "https://generativelanguage.googleapis.com/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

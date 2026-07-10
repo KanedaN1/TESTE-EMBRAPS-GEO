@@ -102,9 +102,9 @@ ${JSON.stringify(contextData).substring(0, 1500)} // Truncado para limite
 O usuário pediu o seguinte: "${command}"
 Responda de forma clara, profissional, focada em segurança e operação. Máx 3 parágrafos.`;
 
-    // Chamada direta para evitar CORS e problemas de Proxy
+    // Chamada usando o proxy do Vite para evitar problemas de CORS
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+      `/api-gemini/v1beta/models/gemini-flash-latest:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {
