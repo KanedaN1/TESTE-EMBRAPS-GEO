@@ -1,0 +1,133 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0,0,0,0.5);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.organogram-modal-content {
+  width: 90vw;
+  height: 85vh;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.organogram-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+  overflow-x: auto;
+}
+
+.org-level {
+  display: flex;
+  justify-content: center;
+  position: relative;
+}
+
+.org-branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.org-box {
+  padding: 12px 24px;
+  border-radius: 12px;
+  background: white;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(15, 76, 129, 0.1);
+  text-align: center;
+  min-width: 150px;
+  z-index: 2;
+}
+
+.root-box {
+  background: var(--primary-blue);
+  color: white;
+  border: none;
+}
+.root-box h3 { margin: 0; font-size: 1.1rem; }
+
+.coord-box {
+  background: linear-gradient(135deg, #f0f7ff, #e0f2fe);
+  border-left: 4px solid var(--primary-blue);
+}
+.coord-box h4 { margin: 0; color: var(--primary-blue); font-size: 1rem;}
+
+.sup-box {
+  background: white;
+  border-left: 4px solid var(--secondary-blue);
+}
+.sup-box h5 { margin: 0; color: var(--text-dark); font-size: 0.95rem;}
+
+.org-role {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+  display: block;
+}
+
+.postos-list-box {
+  margin-top: 8px;
+  background: rgba(255,255,255,0.8);
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 150px;
+  max-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2;
+}
+
+.posto-item {
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  background: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.operacional { background-color: var(--success); }
+.status-dot.alerta { background-color: var(--danger); }
+.status-dot.clima { background-color: var(--secondary-blue); }
+
+.org-lines-down {
+  width: 2px;
+  height: 30px;
+  background-color: var(--secondary-blue);
+  opacity: 0.5;
+}
+
+.org-lines-down-small {
+  width: 2px;
+  height: 20px;
+  background-color: var(--secondary-blue);
+  opacity: 0.5;
+}
+
+/* Conectores horizontais simplificados com flex gap - o CSS do flex gap já faz grande parte da organização das branches */

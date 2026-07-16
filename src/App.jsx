@@ -3,15 +3,29 @@ import Header from './components/Header';
 import Filters from './components/Filters';
 import SidebarChat from './components/SidebarChat';
 import MapComponent from './components/MapComponent';
+import OrganogramModal from './components/OrganogramModal';
 import { postos as mockPostos, getDadosMensais, getTopOcorrencias, supervisors as mockSupervisors } from './services/mockData';
 import { fetchWeather, fetchContelePlaces, fetchConteleUsers, geocodeAddress, getTomTomRoute } from './services/apiServices';
 import './index.css';
+
+// Helpers para LocalStorage
+const loadLocal = (key, defaultVal) => {
+  const data = localStorage.getItem(key);
+  return data ? JSON.parse(data) : defaultVal;
+};
+const saveLocal = (key, data) => localStorage.setItem(key, JSON.stringify(data));
+
+const defaultCoordenadores = [
+  { id: 1, name: 'Coordenador 1' },
+  { id: 2, name: 'Coordenador 2' },
+  { id: 3, name: 'Coordenador 3' },
+  { id: 4, name: 'Coordenador 4' }
+];
 
 function App() {
   const [currentMonth, setCurrentMonth] = useState('Janeiro');
   const [filters, setFilters] = useState({ nome: '', supervisor: '', bairro: '', status: '' });
   
-  // Toggles
   const [heatmapActive, setHeatmapActive] = useState(false);
   const [routeActive, setRouteActive] = useState(false);
   const [trafficActive, setTrafficActive] = useState(false);
@@ -21,22 +35,28 @@ function App() {
   const [conteleData, setConteleData] = useState([]);
   const [conteleUsers, setConteleUsers] = useState([]);
   
-  // Novos estados para criação manual
-  const [customPostos, setCustomPostos] = useState([]);
-  const [customSupervisores, setCustomSupervisores] = useState([]);
+  // Estados Persistentes
+  const [customPostos, setCustomPostos] = useState(() => loadLocal('customPostos', []));
+  const [postosOverrides, setPostosOverrides] = useState(() => loadLocal('postosOverrides', {}));
+  const [customSupervisores, setCustomSupervisores] = useState(() => loadLocal('customSupervisores', []));
+  const [coordenadores, setCoordenadores] = useState(() => loadLocal('coordenadores', defaultCoordenadores));
+  
   const [tomTomRouteCoords, setTomTomRouteCoords] = useState(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
 
   // Modals
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showPostosModal, setShowPostosModal] = useState(false);
+  const [showEditPostoModal, setShowEditPostoModal] = useState(false);
   const [showSupModal, setShowSupModal] = useState(false);
+  const [showCoordModal, setShowCoordModal] = useState(false);
+  const [showOrganogramModal, setShowOrganogramModal] = useState(false);
 
   // Form states
-  const [newPosto, setNewPosto] = useState({ nome: '', address: '', comporta: false, supervisor: '', telefone: '' });
-  const [newSup, setNewSup] = useState({ nome: '', turno: 'Diurno' });
+  const [editingPosto, setEditingPosto] = useState(null);
+  const [newSup, setNewSup] = useState({ nome: '', turno: 'Diurno', coordenador: '' });
   const [expandedSupId, setExpandedSupId] = useState(null);
+  const [editingCoord, setEditingCoord] = useState(null); // {id, name}
 
-  // Check APIs on mount
   useEffect(() => {
     const initData = async () => {
       const data = await fetchWeather();
@@ -45,7 +65,7 @@ function App() {
         if (data.current.precipitation > 0) setWeatherActive(true);
       } else {
         setWeatherActive(true); 
-        setPluviometer(12.5); // mock tempestade
+        setPluviometer(12.5);
       }
 
       const [placesResponse, usersResponse] = await Promise.all([
@@ -56,7 +76,6 @@ function App() {
       if (placesResponse && Array.isArray(placesResponse)) {
         setConteleData(placesResponse);
       }
-      
       if (usersResponse && Array.isArray(usersResponse)) {
         setConteleUsers(usersResponse);
       }
@@ -64,12 +83,17 @@ function App() {
     initData();
   }, []);
 
+  // Sync LocalStorage
+  useEffect(() => saveLocal('customPostos', customPostos), [customPostos]);
+  useEffect(() => saveLocal('postosOverrides', postosOverrides), [postosOverrides]);
+  useEffect(() => saveLocal('customSupervisores', customSupervisores), [customSupervisores]);
+  useEffect(() => saveLocal('coordenadores', coordenadores), [coordenadores]);
+
   const allSupervisores = useMemo(() => {
-    const base = conteleUsers.length > 0 ? conteleUsers : mockSupervisors;
+    const base = conteleUsers.length > 0 ? conteleUsers.map(u => ({...u, name: u.firstName || u.name})) : mockSupervisors;
     return [...base, ...customSupervisores];
   }, [conteleUsers, customSupervisores]);
 
-  // Compute enriched postos with current month data and business rules
   const enrichedPostos = useMemo(() => {
     const basePostos = conteleData.length > 0 ? [...mockPostos, ...conteleData.filter(c => c.lat && c.lng).map(c => ({
       id: c.id || Math.random(),
@@ -84,32 +108,38 @@ function App() {
       telefone: ''
     }))] : mockPostos;
 
-    const allPostos = [...basePostos, ...customPostos];
+    const allPostosBase = [...basePostos, ...customPostos];
     const monthlyData = getDadosMensais(currentMonth);
     const topOccurrences = getTopOcorrencias(currentMonth);
+    const now = Date.now();
+    const seteDias = 7 * 24 * 60 * 60 * 1000;
 
-    return allPostos.map(posto => {
-      const data = monthlyData.find(d => d.postoId === posto.id) || { faltas: 0, demissoes: 0, posVenda: 0 };
+    return allPostosBase.map(posto => {
+      const override = postosOverrides[posto.id] || {};
+      const merged = { ...posto, ...override };
+
+      const mockData = monthlyData.find(d => d.postoId === merged.id) || { faltas: 0, demissoes: 0, posVenda: 0 };
+      
+      merged.faltas = merged.faltasMensais !== undefined ? merged.faltasMensais : mockData.faltas;
+      merged.demissoes = merged.demissoesMensais !== undefined ? merged.demissoesMensais : mockData.demissoes;
+      merged.posVenda = merged.posVendaMensais !== undefined ? merged.posVendaMensais : mockData.posVenda;
       
       let status = 'Operacional'; // Verde
+      let isAlerta = topOccurrences.topFaltas.includes(merged.id) || topOccurrences.topDemissoes.includes(merged.id) || merged.posVenda > 0;
       
-      // Regra de Alerta (Vermelho)
-      const isTopFaltas = topOccurrences.topFaltas.includes(posto.id);
-      const isTopDemissoes = topOccurrences.topDemissoes.includes(posto.id);
-      if (isTopFaltas || isTopDemissoes || data.posVenda > 0) {
-        status = 'Alerta';
+      if (merged.alertaManual) {
+         if (now - merged.alertaData <= seteDias) {
+           isAlerta = true;
+         }
       }
 
-      // Regra de Clima (Azul) - Se weatherActive (chuva forte) e tem comporta
-      if (weatherActive && posto.comporta) {
-        status = 'Clima';
-      }
+      if (isAlerta) status = 'Alerta';
+      if (weatherActive && merged.comporta) status = 'Clima';
 
-      return { ...posto, ...data, status };
+      return { ...merged, status };
     });
-  }, [currentMonth, weatherActive, conteleData, customPostos]);
+  }, [currentMonth, weatherActive, conteleData, customPostos, postosOverrides]);
 
-  // Apply filters
   const filteredPostos = useMemo(() => {
     return enrichedPostos.filter(p => {
       const matchNome = p.nome.toLowerCase().includes(filters.nome.toLowerCase());
@@ -119,107 +149,123 @@ function App() {
                        supN.toLowerCase().includes(filters.supervisor.toLowerCase());
       const matchBairro = p.bairro.toLowerCase().includes(filters.bairro.toLowerCase());
       const matchStatus = filters.status ? p.status === filters.status : true;
-
       return matchNome && matchSup && matchBairro && matchStatus;
     });
   }, [enrichedPostos, filters]);
 
-  // Compute KPIs
   const kpis = useMemo(() => {
-    const totalPostos = enrichedPostos.length;
-    let faltas = 0;
-    let demissoes = 0;
-    let posVenda = 0;
-
+    let faltas = 0, demissoes = 0, posVenda = 0;
     enrichedPostos.forEach(p => {
-      faltas += p.faltas || 0;
-      demissoes += p.demissoes || 0;
-      posVenda += p.posVenda || 0;
+      faltas += parseInt(p.faltas) || 0;
+      demissoes += parseInt(p.demissoes) || 0;
+      posVenda += parseInt(p.posVenda) || 0;
     });
-
-    return { totalPostos, faltas, demissoes, posVenda };
+    return { totalPostos: enrichedPostos.length, faltas, demissoes, posVenda };
   }, [enrichedPostos]);
 
-  // TomTom Route Handler
   const handleToggleRoute = async () => {
-    if (routeActive) {
-      setRouteActive(false);
-      setTomTomRouteCoords(null);
-      return;
-    }
-    
+    if (routeActive) { setRouteActive(false); setTomTomRouteCoords(null); return; }
     setLoadingRoute(true);
-    // Ponto de Partida: Embraps
-    const embrapsCoord = await geocodeAddress("Praça Cel. Fernando Prestes, 18 - Macuco, Santos - SP, 11020-010");
+    const embrapsCoord = await geocodeAddress("Praça Cel. Fernando Prestes, 18 - Macuco, Santos - SP");
     const startPoint = embrapsCoord || { lat: -23.9608, lng: -46.3336 }; 
-    
-    // Filtra postos visíveis para a rota
     const points = [startPoint, ...filteredPostos.map(p => ({ lat: p.lat, lng: p.lng }))];
     
     if (points.length > 1) {
-      // Limita a 150 waypoints (limite TomTom Routing)
       const route = await getTomTomRoute(points.slice(0, 150));
-      if (route) {
-        setTomTomRouteCoords(route);
-        setRouteActive(true);
-      } else {
-        alert("Não foi possível calcular a rota. Verifique a chave da API ou tente com menos postos.");
-      }
-    } else {
-      alert("Nenhum posto filtrado para traçar rota.");
-    }
+      if (route) { setTomTomRouteCoords(route); setRouteActive(true); }
+      else alert("Falha na rota TomTom. Verifique API.");
+    } else alert("Nenhum posto filtrado.");
     setLoadingRoute(false);
   };
 
   const handleSavePosto = async () => {
-    let lat = -23.9608, lng = -46.3336; // Default
-    if (newPosto.address) {
-       const coords = await geocodeAddress(newPosto.address);
-       if (coords) { lat = coords.lat; lng = coords.lng; }
-       else alert("Endereço não encontrado, usando coordenadas padrão.");
+    if (editingPosto.isNew) {
+      let lat = -23.9608, lng = -46.3336;
+      if (editingPosto.address) {
+         const coords = await geocodeAddress(editingPosto.address);
+         if (coords) { lat = coords.lat; lng = coords.lng; }
+      }
+      const created = {
+        id: Date.now(),
+        nome: editingPosto.nome || 'Novo Posto',
+        bairro: editingPosto.address || 'Manual',
+        lat, lng, turno: '24h',
+        supervisorDiurno: editingPosto.supervisor,
+        supervisorNoturno: editingPosto.supervisor,
+        comporta: editingPosto.comporta,
+        telefone: editingPosto.telefone,
+        faltasMensais: parseInt(editingPosto.faltasMensais) || 0,
+        demissoesMensais: parseInt(editingPosto.demissoesMensais) || 0,
+        posVendaMensais: parseInt(editingPosto.posVendaMensais) || 0,
+        alertaManual: editingPosto.temAlertaSemanal,
+        alertaData: editingPosto.temAlertaSemanal ? Date.now() : null
+      };
+      setCustomPostos([...customPostos, created]);
+    } else {
+      // Editando existente
+      const overrides = {
+        nome: editingPosto.nome,
+        comporta: editingPosto.comporta,
+        supervisorDiurno: editingPosto.supervisor,
+        supervisorNoturno: editingPosto.supervisor,
+        faltasMensais: parseInt(editingPosto.faltasMensais) || 0,
+        demissoesMensais: parseInt(editingPosto.demissoesMensais) || 0,
+        posVendaMensais: parseInt(editingPosto.posVendaMensais) || 0,
+        alertaManual: editingPosto.temAlertaSemanal,
+        alertaData: editingPosto.temAlertaSemanal ? Date.now() : null
+      };
+      setPostosOverrides({ ...postosOverrides, [editingPosto.id]: overrides });
     }
-    const created = {
-      id: Date.now(),
-      nome: newPosto.nome || 'Novo Posto',
-      bairro: newPosto.address || 'Adicionado Manualmente',
-      lat: lat,
-      lng: lng,
-      turno: '24h',
-      supervisorDiurno: newPosto.supervisor,
-      supervisorNoturno: newPosto.supervisor,
-      comporta: newPosto.comporta,
-      telefone: newPosto.telefone,
-      faltas: 0, demissoes: 0, posVenda: 0
-    };
-    setCustomPostos([...customPostos, created]);
-    setShowAddModal(false);
-    setNewPosto({ nome: '', address: '', comporta: false, supervisor: '', telefone: '' });
+    setShowEditPostoModal(false);
+  };
+
+  const handleDeletePosto = (id) => {
+    if (window.confirm("Deseja ocultar/excluir este posto?")) {
+      setCustomPostos(customPostos.filter(p => p.id !== id));
+      setPostosOverrides({ ...postosOverrides, [id]: { isDeleted: true } });
+    }
+  };
+
+  const openEditPosto = (posto) => {
+    const isNovo = !posto.id;
+    setEditingPosto({
+      isNew: isNovo,
+      id: posto.id,
+      nome: posto.nome || '',
+      address: posto.bairro || '',
+      telefone: posto.telefone || '',
+      supervisor: posto.supervisorDiurno || '',
+      comporta: posto.comporta || false,
+      faltasMensais: posto.faltas !== undefined ? posto.faltas : 0,
+      demissoesMensais: posto.demissoes !== undefined ? posto.demissoes : 0,
+      posVendaMensais: posto.posVenda !== undefined ? posto.posVenda : 0,
+      temAlertaSemanal: !!posto.alertaManual
+    });
+    setShowEditPostoModal(true);
   };
 
   const handleSaveSup = () => {
     if(!newSup.nome) return;
-    setCustomSupervisores([...customSupervisores, { id: Date.now(), name: newSup.nome, turno: newSup.turno }]);
-    setNewSup({ nome: '', turno: 'Diurno' });
+    setCustomSupervisores([...customSupervisores, { 
+      id: Date.now(), name: newSup.nome, turno: newSup.turno, coordenador: newSup.coordenador 
+    }]);
+    setNewSup({ nome: '', turno: 'Diurno', coordenador: '' });
   };
 
-  const handleDeleteSup = (id) => {
-    setCustomSupervisores(customSupervisores.filter(s => s.id !== id));
+  const handleDeleteSup = (id) => setCustomSupervisores(customSupervisores.filter(s => s.id !== id));
+
+  const handleSaveCoord = () => {
+    setCoordenadores(coordenadores.map(c => c.id === editingCoord.id ? editingCoord : c));
+    setEditingCoord(null);
   };
 
-  const printEscalas = () => {
-    window.print();
-  };
+  const printEscalas = () => window.print();
 
   return (
     <>
       <div className="app-container no-print">
         <div className="main-content">
-          <Header 
-            currentMonth={currentMonth} 
-            setCurrentMonth={setCurrentMonth} 
-            kpis={kpis} 
-            pluviometer={pluviometer}
-          />
+          <Header currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} kpis={kpis} pluviometer={pluviometer} />
           
           <Filters 
             onFilterChange={setFilters}
@@ -228,7 +274,7 @@ function App() {
             routeActive={routeActive}
             onToggleSupervisorRoute={handleToggleRoute}
             onSimulateTraffic={() => setTrafficActive(!trafficActive)}
-            onAddPosto={() => setShowAddModal(true)}
+            onAddPosto={() => setShowPostosModal(true)}
             onOpenSupervisors={() => setShowSupModal(true)}
             onPrint={printEscalas}
             supervisores={allSupervisores}
@@ -236,71 +282,139 @@ function App() {
           />
           
           <MapComponent 
-            postos={filteredPostos} 
+            postos={filteredPostos.filter(p => !p.isDeleted)} 
             heatmapActive={heatmapActive}
             routeActive={routeActive}
             tomTomRouteCoords={tomTomRouteCoords}
             trafficActive={trafficActive}
             weatherActive={weatherActive}
+            onEditPosto={openEditPosto}
           />
         </div>
 
         <SidebarChat contextData={{ currentMonth, kpis, postos: enrichedPostos }} />
 
-        {/* Modal Adicionar Posto */}
-        {showAddModal && (
+        {/* Modal Postos (Listagem Geral) */}
+        {showPostosModal && (
           <div style={modalOverlayStyle}>
-            <div className="glass-panel" style={modalContentStyle}>
-              <h2 style={{color: 'var(--primary-blue)', marginBottom: '16px'}}>Adicionar Posto</h2>
-              <input type="text" placeholder="Nome do Posto" value={newPosto.nome} onChange={e => setNewPosto({...newPosto, nome: e.target.value})} className="filter-input" style={{width:'100%', marginBottom:'8px'}} />
-              <input type="text" placeholder="Endereço (Gera Lat/Lng automático)" value={newPosto.address} onChange={e => setNewPosto({...newPosto, address: e.target.value})} className="filter-input" style={{width:'100%', marginBottom:'8px'}} />
-              <input type="text" placeholder="Telefone do posto" value={newPosto.telefone} onChange={e => setNewPosto({...newPosto, telefone: e.target.value})} className="filter-input" style={{width:'100%', marginBottom:'8px'}} />
+            <div className="glass-panel" style={{...modalContentStyle, width: '600px', maxHeight:'80vh', display:'flex', flexDirection:'column'}}>
+              <div style={{display:'flex', justifyContent:'space-between', marginBottom:'16px'}}>
+                <h2 style={{color: 'var(--primary-blue)'}}>Gestão de Postos</h2>
+                <div>
+                  <button className="action-btn active" onClick={() => openEditPosto({})}>+ Novo Posto</button>
+                </div>
+              </div>
+              <div style={{overflowY: 'auto', flex: 1, paddingRight:'8px'}}>
+                {enrichedPostos.filter(p => !p.isDeleted).map(p => (
+                  <div key={p.id} style={{padding:'8px', borderBottom:'1px solid rgba(0,0,0,0.1)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                    <div>
+                      <strong>{p.nome}</strong> <span style={{fontSize:'0.8rem', color:'gray'}}>- {p.bairro}</span>
+                      <div style={{fontSize:'0.8rem'}}>Sup: {p.supervisorDiurno} | Comporta: {p.comporta?'Sim':'Não'}</div>
+                    </div>
+                    <div style={{display:'flex', gap:'8px'}}>
+                      <button className="action-btn" onClick={() => openEditPosto(p)}>Editar</button>
+                      <button className="action-btn" style={{color:'var(--danger)', borderColor:'var(--danger)'}} onClick={() => handleDeletePosto(p.id)}>Excluir</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:'flex', justifyContent:'flex-end', marginTop:'16px'}}>
+                <button className="action-btn" onClick={() => setShowPostosModal(false)}>Fechar</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Editar/Criar Posto */}
+        {showEditPostoModal && editingPosto && (
+          <div style={modalOverlayStyle}>
+            <div className="glass-panel" style={{...modalContentStyle, width: '450px', maxHeight:'90vh', overflowY:'auto'}}>
+              <h2 style={{color: 'var(--primary-blue)', marginBottom: '16px'}}>{editingPosto.isNew ? 'Criar Posto' : 'Editar Posto'}</h2>
               
-              <select className="filter-input" style={{width:'100%', marginBottom:'8px'}} value={newPosto.supervisor} onChange={e => setNewPosto({...newPosto, supervisor: e.target.value})}>
-                <option value="">Selecione o Supervisor Responsável</option>
-                {allSupervisores.map(s => <option key={s.id} value={s.name || s.firstName}>{s.name || s.firstName}</option>)}
+              <label className="form-label">Nome do Posto</label>
+              <input type="text" value={editingPosto.nome} onChange={e => setEditingPosto({...editingPosto, nome: e.target.value})} className="filter-input" style={inputStyle} />
+              
+              {editingPosto.isNew && (
+                <>
+                  <label className="form-label">Endereço (Gera Lat/Lng)</label>
+                  <input type="text" value={editingPosto.address} onChange={e => setEditingPosto({...editingPosto, address: e.target.value})} className="filter-input" style={inputStyle} />
+                </>
+              )}
+              
+              <label className="form-label">Supervisor Responsável</label>
+              <select className="filter-input" style={inputStyle} value={editingPosto.supervisor} onChange={e => setEditingPosto({...editingPosto, supervisor: e.target.value})}>
+                <option value="">Nenhum</option>
+                {allSupervisores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
               </select>
 
               <label style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'16px', color:'var(--text-dark)'}}>
-                <input type="checkbox" checked={newPosto.comporta} onChange={e => setNewPosto({...newPosto, comporta: e.target.checked})} />
-                Possui comporta?
+                <input type="checkbox" checked={editingPosto.comporta} onChange={e => setEditingPosto({...editingPosto, comporta: e.target.checked})} />
+                <strong>Possui comporta?</strong> (Fica AZUL na chuva)
               </label>
 
+              <div style={{borderTop:'1px solid #ccc', margin:'16px 0', paddingTop:'16px'}}>
+                <h4 style={{color:'var(--danger)', marginBottom:'8px'}}>Alertas e Ocorrências</h4>
+                <label style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'16px', color:'var(--text-dark)'}}>
+                  <input type="checkbox" checked={editingPosto.temAlertaSemanal} onChange={e => setEditingPosto({...editingPosto, temAlertaSemanal: e.target.checked})} />
+                  Marcar Alerta Vermelho (Faltas/Demissões semanais ou Pós-venda ruim). <i>Dura 7 dias.</i>
+                </label>
+
+                <div style={{display:'flex', gap:'8px'}}>
+                  <div style={{flex:1}}>
+                    <label className="form-label">Faltas (Mês)</label>
+                    <input type="number" min="0" value={editingPosto.faltasMensais} onChange={e => setEditingPosto({...editingPosto, faltasMensais: e.target.value})} className="filter-input" style={inputStyle} />
+                  </div>
+                  <div style={{flex:1}}>
+                    <label className="form-label">Demissões (Mês)</label>
+                    <input type="number" min="0" value={editingPosto.demissoesMensais} onChange={e => setEditingPosto({...editingPosto, demissoesMensais: e.target.value})} className="filter-input" style={inputStyle} />
+                  </div>
+                  <div style={{flex:1}}>
+                    <label className="form-label">Pós-venda (Mês)</label>
+                    <input type="number" min="0" value={editingPosto.posVendaMensais} onChange={e => setEditingPosto({...editingPosto, posVendaMensais: e.target.value})} className="filter-input" style={inputStyle} />
+                  </div>
+                </div>
+              </div>
+
               <div style={{display:'flex', gap:'8px', justifyContent:'flex-end'}}>
-                <button className="action-btn" onClick={() => setShowAddModal(false)}>Cancelar</button>
+                <button className="action-btn" onClick={() => setShowEditPostoModal(false)}>Cancelar</button>
                 <button className="action-btn active" onClick={handleSavePosto}>Salvar</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Modal Supervisores */}
+        {/* Modal Supervisores e Coordenadores */}
         {showSupModal && (
           <div style={modalOverlayStyle}>
-            <div className="glass-panel" style={{...modalContentStyle, width: '500px'}}>
-              <h2 style={{color: 'var(--primary-blue)', marginBottom: '16px'}}>Gestão de Supervisores</h2>
+            <div className="glass-panel" style={{...modalContentStyle, width: '600px', maxHeight:'90vh', overflowY:'auto'}}>
+              <div style={{display:'flex', justifyContent:'space-between', marginBottom:'16px'}}>
+                <h2 style={{color: 'var(--primary-blue)'}}>Gestão Operacional</h2>
+                <div style={{display:'flex', gap:'8px'}}>
+                  <button className="action-btn" onClick={() => setShowCoordModal(true)}>Coordenadores</button>
+                  <button className="action-btn active" onClick={() => setShowOrganogramModal(true)}>Organograma</button>
+                </div>
+              </div>
               
-              {/* Add Supervisor Form */}
               <div style={{display:'flex', gap:'8px', marginBottom:'16px'}}>
-                <input type="text" placeholder="Nome do Supervisor" value={newSup.nome} onChange={e=>setNewSup({...newSup, nome: e.target.value})} className="filter-input" style={{flex: 1}} />
-                <select value={newSup.turno} onChange={e=>setNewSup({...newSup, turno: e.target.value})} className="filter-input">
-                  <option value="Diurno">Diurno</option>
-                  <option value="Noturno">Noturno</option>
+                <input type="text" placeholder="Novo Supervisor" value={newSup.nome} onChange={e=>setNewSup({...newSup, nome: e.target.value})} className="filter-input" style={{flex: 1}} />
+                <select value={newSup.coordenador} onChange={e=>setNewSup({...newSup, coordenador: e.target.value})} className="filter-input" style={{width:'150px'}}>
+                  <option value="">Sem Coord.</option>
+                  {coordenadores.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
                 <button className="action-btn active" onClick={handleSaveSup}>Criar</button>
               </div>
 
-              <ul style={{listStyle:'none', padding:0, marginBottom:'16px', color:'var(--text-dark)', maxHeight: '300px', overflowY: 'auto'}}>
+              <ul style={{listStyle:'none', padding:0, color:'var(--text-dark)'}}>
                 {allSupervisores.map(u => {
-                  const nome = u.name || u.firstName || 'Supervisor';
-                  const postosResp = enrichedPostos.filter(p => p.supervisorDiurno === nome || p.supervisorNoturno === nome).length;
+                  const nome = u.name;
+                  const postosResp = enrichedPostos.filter(p => !p.isDeleted && (p.supervisorDiurno === nome || p.supervisorNoturno === nome)).length;
                   const isCustom = customSupervisores.some(cs => cs.id === u.id);
                   return (
                     <li key={u.id} style={{padding:'8px', borderBottom:'1px solid rgba(0,0,0,0.1)', display:'flex', flexDirection:'column'}}>
                       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', cursor: 'pointer'}} onClick={() => setExpandedSupId(expandedSupId === u.id ? null : u.id)}>
                         <div>
-                          <strong>{nome}</strong> ({u.turno || u.role || 'Geral'}) <br/>
-                          <small style={{color:'var(--primary-blue)'}}>{postosResp} postos atribuídos (clique para ver)</small>
+                          <strong>{nome}</strong> <span style={{fontSize:'0.8rem'}}>({u.coordenador ? `Coord: ${u.coordenador}` : 'Sem Coord'})</span> <br/>
+                          <small style={{color:'var(--primary-blue)'}}>{postosResp} postos atribuídos</small>
                         </div>
                         {isCustom && (
                           <button className="action-btn" style={{color:'var(--danger)', borderColor:'var(--danger)'}} onClick={(e) => { e.stopPropagation(); handleDeleteSup(u.id); }}>Excluir</button>
@@ -308,53 +422,81 @@ function App() {
                       </div>
                       
                       {expandedSupId === u.id && (
-                        <div style={{marginTop: '8px', padding: '8px', background: 'rgba(59,130,246,0.1)', borderRadius: '8px', color: 'var(--text-dark)'}}>
+                        <div style={{marginTop: '8px', padding: '8px', background: 'rgba(59,130,246,0.1)', borderRadius: '8px'}}>
                           {postosResp > 0 ? (
                             <ul style={{listStyle:'disc', paddingLeft:'20px', fontSize:'0.85rem'}}>
-                              {enrichedPostos.filter(p => p.supervisorDiurno === nome || p.supervisorNoturno === nome).map(p => (
-                                <li key={p.id}>{p.nome} - {p.bairro}</li>
+                              {enrichedPostos.filter(p => !p.isDeleted && (p.supervisorDiurno === nome || p.supervisorNoturno === nome)).map(p => (
+                                <li key={p.id}>{p.nome}</li>
                               ))}
                             </ul>
-                          ) : (
-                            <span style={{fontSize:'0.85rem', color:'var(--text-light)'}}>Nenhum posto atribuído a este supervisor.</span>
-                          )}
+                          ) : <span style={{fontSize:'0.85rem', color:'var(--text-light)'}}>Nenhum posto atribuído.</span>}
                         </div>
                       )}
                     </li>
                   )
                 })}
               </ul>
-              <div style={{display:'flex', justifyContent:'flex-end'}}>
+              <div style={{display:'flex', justifyContent:'flex-end', marginTop:'16px'}}>
                 <button className="action-btn" onClick={() => setShowSupModal(false)}>Fechar</button>
               </div>
             </div>
           </div>
         )}
+
+        {/* Modal Coordenadores */}
+        {showCoordModal && (
+          <div style={modalOverlayStyle}>
+            <div className="glass-panel" style={{...modalContentStyle, width: '400px'}}>
+              <h2 style={{color: 'var(--primary-blue)', marginBottom: '16px'}}>Coordenadores</h2>
+              {coordenadores.map(c => (
+                <div key={c.id} style={{display:'flex', gap:'8px', marginBottom:'8px'}}>
+                  {editingCoord?.id === c.id ? (
+                    <>
+                      <input type="text" value={editingCoord.name} onChange={e=>setEditingCoord({...editingCoord, name:e.target.value})} className="filter-input" style={{flex:1}} />
+                      <button className="action-btn active" onClick={handleSaveCoord}>OK</button>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{flex:1, alignSelf:'center'}}>{c.name}</span>
+                      <button className="action-btn" onClick={() => setEditingCoord(c)}>Editar</button>
+                    </>
+                  )}
+                </div>
+              ))}
+              <div style={{display:'flex', justifyContent:'flex-end', marginTop:'16px'}}>
+                <button className="action-btn" onClick={() => setShowCoordModal(false)}>Voltar</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showOrganogramModal && (
+          <OrganogramModal 
+            coordenadores={coordenadores}
+            supervisores={allSupervisores}
+            postos={enrichedPostos.filter(p => !p.isDeleted)}
+            onClose={() => setShowOrganogramModal(false)}
+          />
+        )}
       </div>
 
-      {/* Renderização Exclusiva para Impressão */}
       <div className="print-container print-only">
+        {/* Lógica de Impressão (Mantida) */}
         {allSupervisores.map(sup => {
-          const supName = sup.name || sup.firstName;
-          const postosSup = enrichedPostos.filter(p => p.supervisorDiurno === supName || p.supervisorNoturno === supName);
-          
-          if(postosSup.length === 0) return null; // Não imprime supervisor sem postos
-
+          const supName = sup.name;
+          const postosSup = enrichedPostos.filter(p => !p.isDeleted && (p.supervisorDiurno === supName || p.supervisorNoturno === supName));
+          if(postosSup.length === 0) return null;
           return (
             <div key={sup.id} className="print-page">
               <div className="print-header">
-                <h2>Escala de Supervisor: {supName}</h2>
-                <p>Turno: {sup.turno || 'Geral'} | Total de Postos: {postosSup.length}</p>
+                <h2>Escala: {supName}</h2>
                 <hr />
               </div>
               <div className="print-postos-grid">
                 {postosSup.map(p => (
                   <div key={p.id} className="print-posto-card">
                     <h3>{p.nome}</h3>
-                    <p><strong>Bairro:</strong> {p.bairro}</p>
-                    <p><strong>Telefone:</strong> {p.telefone || 'N/A'}</p>
-                    <p><strong>Comporta:</strong> {p.comporta ? 'Sim' : 'Não'}</p>
-                    <p><strong>Status:</strong> {p.status}</p>
+                    <p>Status: {p.status}</p>
                   </div>
                 ))}
               </div>
@@ -373,8 +515,10 @@ const modalOverlayStyle = {
 };
 
 const modalContentStyle = {
-  padding: '24px', width: '400px', backgroundColor: 'rgba(255,255,255,0.95)',
-  borderRadius: '16px'
+  padding: '24px', backgroundColor: 'rgba(255,255,255,0.95)',
+  borderRadius: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
 };
+
+const inputStyle = { width:'100%', marginBottom:'12px' };
 
 export default App;

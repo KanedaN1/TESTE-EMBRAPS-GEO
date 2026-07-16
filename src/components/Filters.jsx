@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Filter, Map as MapIcon, Route, Plus, Edit, Users, Car, Printer } from 'lucide-react';
+import { Filter, Map as MapIcon, Route, ClipboardList, Edit, Users, Car, Printer } from 'lucide-react';
 
 export default function Filters({ 
   onFilterChange, 
@@ -86,8 +86,8 @@ export default function Filters({
 
       <div style={{ flex: 1 }}></div>
 
-      <button className="action-btn" onClick={onAddPosto}>
-        <Plus size={16} /> Adicionar
+      <button className="action-btn" onClick={onAddPosto} title="Gerenciar todos os postos">
+        <ClipboardList size={16} /> Postos
       </button>
       <button className="action-btn" onClick={onOpenSupervisors}>
         <Users size={16} /> Supervisores

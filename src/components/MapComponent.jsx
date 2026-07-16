@@ -12,15 +12,13 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Custom Icons for Business Rules
-const createCustomIcon = (color) => {
-  return new L.Icon({
-    iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
+// Custom Icons for Business Rules using CSS classes
+const createCustomIcon = (colorClass) => {
+  return new L.divIcon({
+    className: `transit-marker ${colorClass}`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+    popupAnchor: [0, -10],
   });
 };
 
@@ -42,7 +40,8 @@ function HeatmapLayer({ data, active }) {
       return;
     }
 
-    const points = data.map(p => [p.lat, p.lng, 1]); // intensidade
+    // Apenas mostrar heatmap para postos em alerta (vermelhos)
+    const points = data.filter(p => p.status === 'Alerta').map(p => [p.lat, p.lng, 1]); // intensidade
     heatLayerRef.current = L.heatLayer(points, {
       radius: 40,
       blur: 25,
@@ -60,7 +59,7 @@ function HeatmapLayer({ data, active }) {
   return null;
 }
 
-export default function MapComponent({ postos, heatmapActive, routeActive, tomTomRouteCoords, trafficActive, weatherActive }) {
+export default function MapComponent({ postos, heatmapActive, routeActive, tomTomRouteCoords, trafficActive, weatherActive, onEditPosto }) {
   const baixadaSantista = [-23.9608, -46.3336]; // Santos center
 
   // Supervisor routing logic
@@ -118,6 +117,11 @@ export default function MapComponent({ postos, heatmapActive, routeActive, tomTo
                   <span className={`status-badge ${posto.status.toLowerCase()}`}>
                     {posto.status}
                   </span>
+                  <div style={{marginTop: '12px', borderTop: '1px solid #eee', paddingTop: '8px'}}>
+                    <button className="action-btn" style={{width: '100%', justifyContent: 'center', fontSize: '0.85rem'}} onClick={() => onEditPosto && onEditPosto(posto)}>
+                      ✏️ Editar Posto
+                    </button>
+                  </div>
                 </div>
               </Popup>
             </Marker>

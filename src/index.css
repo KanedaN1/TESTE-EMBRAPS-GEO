@@ -33,11 +33,11 @@ body {
 /* Glassmorphism Utilities */
 .glass-panel {
   background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
-  border-radius: 16px;
+  box-shadow: 0 10px 40px -10px rgba(15, 76, 129, 0.2);
+  border-radius: 20px;
 }
 
 /* Animations */
@@ -55,8 +55,9 @@ body {
   display: flex;
   height: 100vh;
   width: 100vw;
-  padding: 8px 16px;
-  gap: 12px;
+  padding: 16px;
+  gap: 16px;
+  position: relative;
 }
 
 .main-content {
@@ -65,6 +66,7 @@ body {
   flex: 1;
   gap: 16px;
   height: 100%;
+  position: relative;
 }
 
 .map-container {
@@ -250,14 +252,28 @@ body {
   transform: scale(1.05);
 }
 
-/* Filters & Actions Bar */
+/* Filters & Actions Bar (Floating Dock) */
 .filters-bar {
   display: flex;
-  gap: 8px;
-  padding: 8px 16px;
+  gap: 12px;
+  padding: 12px 24px;
   align-items: center;
-  flex-wrap: wrap;
+  justify-content: center;
+  flex-wrap: nowrap;
   z-index: 1000;
+  position: absolute;
+  top: 76px; /* Below header */
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 30px;
+  width: max-content;
+  max-width: 90%;
+  overflow-x: auto;
+  box-shadow: 0 10px 30px rgba(15, 76, 129, 0.15);
+}
+
+.filters-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .filter-input {
@@ -303,8 +319,32 @@ body {
 .leaflet-container {
   width: 100%;
   height: 100%;
-  border-radius: 16px;
+  border-radius: 20px;
   z-index: 1;
+}
+
+/* Clean Transit Markers */
+.transit-marker {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.transit-marker:hover {
+  transform: scale(1.2);
+}
+.transit-marker.green {
+  background-color: var(--success);
+}
+.transit-marker.red {
+  background-color: var(--danger);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
+}
+.transit-marker.blue {
+  background-color: var(--secondary-blue);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.8);
 }
 
 /* Map Popups custom style */
