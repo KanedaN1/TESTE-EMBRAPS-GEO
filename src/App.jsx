@@ -39,6 +39,7 @@ function App() {
   const [customPostos, setCustomPostos] = useState(() => loadLocal('customPostos', []));
   const [postosOverrides, setPostosOverrides] = useState(() => loadLocal('postosOverrides', {}));
   const [customSupervisores, setCustomSupervisores] = useState(() => loadLocal('customSupervisores', []));
+  const [deletedSupervisores, setDeletedSupervisores] = useState(() => loadLocal('deletedSupervisores', []));
   const [coordenadores, setCoordenadores] = useState(() => loadLocal('coordenadores', defaultCoordenadores));
   
   const [tomTomRouteCoords, setTomTomRouteCoords] = useState(null);
@@ -54,6 +55,7 @@ function App() {
   // Form states
   const [editingPosto, setEditingPosto] = useState(null);
   const [newSup, setNewSup] = useState({ nome: '', turno: 'Diurno', coordenador: '' });
+  const [newCoord, setNewCoord] = useState('');
   const [expandedSupId, setExpandedSupId] = useState(null);
   const [editingCoord, setEditingCoord] = useState(null); // {id, name}
 
@@ -87,12 +89,20 @@ function App() {
   useEffect(() => saveLocal('customPostos', customPostos), [customPostos]);
   useEffect(() => saveLocal('postosOverrides', postosOverrides), [postosOverrides]);
   useEffect(() => saveLocal('customSupervisores', customSupervisores), [customSupervisores]);
+  useEffect(() => saveLocal('deletedSupervisores', deletedSupervisores), [deletedSupervisores]);
   useEffect(() => saveLocal('coordenadores', coordenadores), [coordenadores]);
 
   const allSupervisores = useMemo(() => {
-    const base = conteleUsers.length > 0 ? conteleUsers.map(u => ({...u, name: u.firstName || u.name})) : mockSupervisors;
-    return [...base, ...customSupervisores];
-  }, [conteleUsers, customSupervisores]);
+    const base = conteleUsers.length > 0 ? conteleUsers : mockSupervisors;
+    // Filter out empty names and map them properly
+    const mappedBase = base
+      .filter(u => u.firstName || u.name || u.nome)
+      .map(u => ({...u, name: u.firstName || u.name || u.nome}));
+      
+    // Combine base and custom, then filter out deleted ones
+    const combined = [...mappedBase, ...customSupervisores];
+    return combined.filter(u => !deletedSupervisores.includes(u.id));
+  }, [conteleUsers, customSupervisores, deletedSupervisores]);
 
   const enrichedPostos = useMemo(() => {
     const basePostos = conteleData.length > 0 ? [...mockPostos, ...conteleData.filter(c => c.lat && c.lng).map(c => ({
@@ -246,17 +256,31 @@ function App() {
 
   const handleSaveSup = () => {
     if(!newSup.nome) return;
-    setCustomSupervisores([...customSupervisores, { 
+    setCustomSupervisores([{ 
       id: Date.now(), name: newSup.nome, turno: newSup.turno, coordenador: newSup.coordenador 
-    }]);
+    }, ...customSupervisores]); // Add to top
     setNewSup({ nome: '', turno: 'Diurno', coordenador: '' });
   };
 
-  const handleDeleteSup = (id) => setCustomSupervisores(customSupervisores.filter(s => s.id !== id));
+  const handleDeleteSup = (id) => {
+    // Add to deleted list (works for both custom and API)
+    setDeletedSupervisores([...deletedSupervisores, id]);
+  };
 
   const handleSaveCoord = () => {
-    setCoordenadores(coordenadores.map(c => c.id === editingCoord.id ? editingCoord : c));
-    setEditingCoord(null);
+    if (editingCoord) {
+      setCoordenadores(coordenadores.map(c => c.id === editingCoord.id ? editingCoord : c));
+      setEditingCoord(null);
+    } else if (newCoord) {
+      setCoordenadores([...coordenadores, { id: Date.now(), name: newCoord }]);
+      setNewCoord('');
+    }
+  };
+
+  const handleDeleteCoord = (id) => {
+    if (window.confirm("Deseja realmente excluir este coordenador?")) {
+      setCoordenadores(coordenadores.filter(c => c.id !== id));
+    }
   };
 
   const printEscalas = () => window.print();
@@ -416,9 +440,7 @@ function App() {
                           <strong>{nome}</strong> <span style={{fontSize:'0.8rem'}}>({u.coordenador ? `Coord: ${u.coordenador}` : 'Sem Coord'})</span> <br/>
                           <small style={{color:'var(--primary-blue)'}}>{postosResp} postos atribuídos</small>
                         </div>
-                        {isCustom && (
-                          <button className="action-btn" style={{color:'var(--danger)', borderColor:'var(--danger)'}} onClick={(e) => { e.stopPropagation(); handleDeleteSup(u.id); }}>Excluir</button>
-                        )}
+                        <button className="action-btn" style={{color:'var(--danger)', borderColor:'var(--danger)'}} onClick={(e) => { e.stopPropagation(); handleDeleteSup(u.id); }}>Excluir</button>
                       </div>
                       
                       {expandedSupId === u.id && (
@@ -448,6 +470,12 @@ function App() {
           <div style={modalOverlayStyle}>
             <div className="glass-panel" style={{...modalContentStyle, width: '400px'}}>
               <h2 style={{color: 'var(--primary-blue)', marginBottom: '16px'}}>Coordenadores</h2>
+              
+              <div style={{display:'flex', gap:'8px', marginBottom:'16px'}}>
+                <input type="text" placeholder="Novo Coordenador" value={newCoord} onChange={e=>setNewCoord(e.target.value)} className="filter-input" style={{flex: 1}} />
+                <button className="action-btn active" onClick={handleSaveCoord}>Adicionar</button>
+              </div>
+
               {coordenadores.map(c => (
                 <div key={c.id} style={{display:'flex', gap:'8px', marginBottom:'8px'}}>
                   {editingCoord?.id === c.id ? (
@@ -459,6 +487,7 @@ function App() {
                     <>
                       <span style={{flex:1, alignSelf:'center'}}>{c.name}</span>
                       <button className="action-btn" onClick={() => setEditingCoord(c)}>Editar</button>
+                      <button className="action-btn" style={{color:'var(--danger)', borderColor:'var(--danger)'}} onClick={() => handleDeleteCoord(c.id)}>Excluir</button>
                     </>
                   )}
                 </div>

@@ -259,21 +259,13 @@ body {
   padding: 12px 24px;
   align-items: center;
   justify-content: center;
-  flex-wrap: nowrap;
-  z-index: 1000;
-  position: absolute;
-  top: 76px; /* Below header */
-  left: 50%;
-  transform: translateX(-50%);
+  flex-wrap: wrap;
+  z-index: 10;
   border-radius: 30px;
-  width: max-content;
-  max-width: 90%;
-  overflow-x: auto;
+  width: fit-content;
+  max-width: 100%;
+  margin: -8px auto 8px auto; /* Pull it slightly up and center it */
   box-shadow: 0 10px 30px rgba(15, 76, 129, 0.15);
-}
-
-.filters-bar::-webkit-scrollbar {
-  display: none;
 }
 
 .filter-input {
