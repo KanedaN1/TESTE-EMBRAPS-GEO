@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Calendar, Users, AlertTriangle, UserMinus, ThumbsDown, CloudRain, Edit2, Check, X } from 'lucide-react';
+import logo from '../../assets/img/logo.png';
 
 export default function Header({ currentMonth, setCurrentMonth, kpis, pluviometer, globalKpis = { faltas: 0, demissoes: 0, posVenda: 0 }, setGlobalKpis }) {
   const months = ['Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -18,8 +19,8 @@ export default function Header({ currentMonth, setCurrentMonth, kpis, pluviomete
 
   return (
     <div className="header glass-panel animate-fade-in">
-      <div className="header-title">
-        <h1>Embraps Geo</h1>
+      <div className="header-title" style={{ display: 'flex', alignItems: 'center' }}>
+        <img src={logo} alt="Embraps Geo Logo" style={{ height: '40px', objectFit: 'contain' }} />
       </div>
       
       <div className="header-controls">
