@@ -12,7 +12,7 @@ export default function OrganogramModal({ coordenadores, supervisores, postos, o
   };
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="glass-panel organogram-modal-content">
         <div className="modal-header" style={{display:'flex', justifyContent:'space-between', marginBottom:'20px'}}>
           <h2 style={{color: 'var(--primary-blue)'}}>Organograma Operacional</h2>

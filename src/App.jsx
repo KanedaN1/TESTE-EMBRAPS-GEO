@@ -23,7 +23,7 @@ const defaultCoordenadores = [
 ];
 
 function App() {
-  const [currentMonth, setCurrentMonth] = useState('Janeiro');
+  const [currentMonth, setCurrentMonth] = useState('Julho');
   const [filters, setFilters] = useState({ nome: '', supervisor: '', bairro: '', status: '' });
   
   const [heatmapActive, setHeatmapActive] = useState(false);
@@ -39,8 +39,10 @@ function App() {
   const [customPostos, setCustomPostos] = useState(() => loadLocal('customPostos', []));
   const [postosOverrides, setPostosOverrides] = useState(() => loadLocal('postosOverrides', {}));
   const [customSupervisores, setCustomSupervisores] = useState(() => loadLocal('customSupervisores', []));
+  const [supervisoresOverrides, setSupervisoresOverrides] = useState(() => loadLocal('supervisoresOverrides', {}));
   const [deletedSupervisores, setDeletedSupervisores] = useState(() => loadLocal('deletedSupervisores', []));
   const [coordenadores, setCoordenadores] = useState(() => loadLocal('coordenadores', defaultCoordenadores));
+  const [globalKpis, setGlobalKpis] = useState(() => loadLocal('globalKpis', { faltas: 0, demissoes: 0, posVenda: 0 }));
   
   const [tomTomRouteCoords, setTomTomRouteCoords] = useState(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
@@ -58,6 +60,22 @@ function App() {
   const [newCoord, setNewCoord] = useState('');
   const [expandedSupId, setExpandedSupId] = useState(null);
   const [editingCoord, setEditingCoord] = useState(null); // {id, name}
+  const [editingSup, setEditingSup] = useState(null); // {id, coordenador}
+  const [postosModalFilterSup, setPostosModalFilterSup] = useState('');
+
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        setShowPostosModal(false);
+        setShowEditPostoModal(false);
+        setShowSupModal(false);
+        setShowCoordModal(false);
+        setShowOrganogramModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
 
   useEffect(() => {
     const initData = async () => {
@@ -89,8 +107,10 @@ function App() {
   useEffect(() => saveLocal('customPostos', customPostos), [customPostos]);
   useEffect(() => saveLocal('postosOverrides', postosOverrides), [postosOverrides]);
   useEffect(() => saveLocal('customSupervisores', customSupervisores), [customSupervisores]);
+  useEffect(() => saveLocal('supervisoresOverrides', supervisoresOverrides), [supervisoresOverrides]);
   useEffect(() => saveLocal('deletedSupervisores', deletedSupervisores), [deletedSupervisores]);
   useEffect(() => saveLocal('coordenadores', coordenadores), [coordenadores]);
+  useEffect(() => saveLocal('globalKpis', globalKpis), [globalKpis]);
 
   const allSupervisores = useMemo(() => {
     const base = conteleUsers.length > 0 ? conteleUsers : mockSupervisors;
@@ -100,9 +120,14 @@ function App() {
       .map(u => ({...u, name: u.firstName || u.name || u.nome}));
       
     // Combine base and custom, then filter out deleted ones
-    const combined = [...mappedBase, ...customSupervisores];
+    const combined = [...mappedBase, ...customSupervisores].map(u => {
+      if (supervisoresOverrides[u.id]) {
+        return { ...u, ...supervisoresOverrides[u.id] };
+      }
+      return u;
+    });
     return combined.filter(u => !deletedSupervisores.includes(u.id));
-  }, [conteleUsers, customSupervisores, deletedSupervisores]);
+  }, [conteleUsers, customSupervisores, supervisoresOverrides, deletedSupervisores]);
 
   const enrichedPostos = useMemo(() => {
     const basePostos = conteleData.length > 0 ? [...mockPostos, ...conteleData.filter(c => c.lat && c.lng).map(c => ({
@@ -164,14 +189,13 @@ function App() {
   }, [enrichedPostos, filters]);
 
   const kpis = useMemo(() => {
-    let faltas = 0, demissoes = 0, posVenda = 0;
-    enrichedPostos.forEach(p => {
-      faltas += parseInt(p.faltas) || 0;
-      demissoes += parseInt(p.demissoes) || 0;
-      posVenda += parseInt(p.posVenda) || 0;
-    });
-    return { totalPostos: enrichedPostos.length, faltas, demissoes, posVenda };
-  }, [enrichedPostos]);
+    return { 
+      totalPostos: enrichedPostos.length, 
+      faltas: globalKpis.faltas, 
+      demissoes: globalKpis.demissoes, 
+      posVenda: globalKpis.posVenda 
+    };
+  }, [enrichedPostos.length, globalKpis]);
 
   const handleToggleRoute = async () => {
     if (routeActive) { setRouteActive(false); setTomTomRouteCoords(null); return; }
@@ -289,7 +313,7 @@ function App() {
     <>
       <div className="app-container no-print">
         <div className="main-content">
-          <Header currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} kpis={kpis} pluviometer={pluviometer} />
+          <Header currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} kpis={kpis} pluviometer={pluviometer} globalKpis={globalKpis} setGlobalKpis={setGlobalKpis} />
           
           <Filters 
             onFilterChange={setFilters}
@@ -320,7 +344,7 @@ function App() {
 
         {/* Modal Postos (Listagem Geral) */}
         {showPostosModal && (
-          <div style={modalOverlayStyle}>
+          <div style={modalOverlayStyle} onClick={(e) => e.target === e.currentTarget && setShowPostosModal(false)}>
             <div className="glass-panel" style={{...modalContentStyle, width: '600px', maxHeight:'80vh', display:'flex', flexDirection:'column'}}>
               <div style={{display:'flex', justifyContent:'space-between', marginBottom:'16px'}}>
                 <h2 style={{color: 'var(--primary-blue)'}}>Gestão de Postos</h2>
@@ -328,8 +352,24 @@ function App() {
                   <button className="action-btn active" onClick={() => openEditPosto({})}>+ Novo Posto</button>
                 </div>
               </div>
+
+              <div style={{marginBottom: '16px'}}>
+                <select 
+                  className="filter-input" 
+                  style={{width: '100%', marginBottom: '0'}} 
+                  value={postosModalFilterSup} 
+                  onChange={(e) => setPostosModalFilterSup(e.target.value)}
+                >
+                  <option value="">Todos os Supervisores</option>
+                  {allSupervisores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                </select>
+              </div>
+
               <div style={{overflowY: 'auto', flex: 1, paddingRight:'8px'}}>
-                {enrichedPostos.filter(p => !p.isDeleted).map(p => (
+                {enrichedPostos
+                  .filter(p => !p.isDeleted)
+                  .filter(p => !postosModalFilterSup || p.supervisorDiurno === postosModalFilterSup || p.supervisorNoturno === postosModalFilterSup)
+                  .map(p => (
                   <div key={p.id} style={{padding:'8px', borderBottom:'1px solid rgba(0,0,0,0.1)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                     <div>
                       <strong>{p.nome}</strong> <span style={{fontSize:'0.8rem', color:'gray'}}>- {p.bairro}</span>
@@ -351,7 +391,7 @@ function App() {
 
         {/* Modal Editar/Criar Posto */}
         {showEditPostoModal && editingPosto && (
-          <div style={modalOverlayStyle}>
+          <div style={modalOverlayStyle} onClick={(e) => e.target === e.currentTarget && setShowEditPostoModal(false)}>
             <div className="glass-panel" style={{...modalContentStyle, width: '450px', maxHeight:'90vh', overflowY:'auto'}}>
               <h2 style={{color: 'var(--primary-blue)', marginBottom: '16px'}}>{editingPosto.isNew ? 'Criar Posto' : 'Editar Posto'}</h2>
               
@@ -409,7 +449,7 @@ function App() {
 
         {/* Modal Supervisores e Coordenadores */}
         {showSupModal && (
-          <div style={modalOverlayStyle}>
+          <div style={modalOverlayStyle} onClick={(e) => e.target === e.currentTarget && setShowSupModal(false)}>
             <div className="glass-panel" style={{...modalContentStyle, width: '600px', maxHeight:'90vh', overflowY:'auto'}}>
               <div style={{display:'flex', justifyContent:'space-between', marginBottom:'16px'}}>
                 <h2 style={{color: 'var(--primary-blue)'}}>Gestão Operacional</h2>
@@ -435,12 +475,36 @@ function App() {
                   const isCustom = customSupervisores.some(cs => cs.id === u.id);
                   return (
                     <li key={u.id} style={{padding:'8px', borderBottom:'1px solid rgba(0,0,0,0.1)', display:'flex', flexDirection:'column'}}>
-                      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', cursor: 'pointer'}} onClick={() => setExpandedSupId(expandedSupId === u.id ? null : u.id)}>
-                        <div>
+                      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                        <div style={{cursor: 'pointer', flex: 1}} onClick={() => setExpandedSupId(expandedSupId === u.id ? null : u.id)}>
                           <strong>{nome}</strong> <span style={{fontSize:'0.8rem'}}>({u.coordenador ? `Coord: ${u.coordenador}` : 'Sem Coord'})</span> <br/>
                           <small style={{color:'var(--primary-blue)'}}>{postosResp} postos atribuídos</small>
                         </div>
-                        <button className="action-btn" style={{color:'var(--danger)', borderColor:'var(--danger)'}} onClick={(e) => { e.stopPropagation(); handleDeleteSup(u.id); }}>Excluir</button>
+                        
+                        {editingSup?.id === u.id ? (
+                          <div style={{display:'flex', gap:'8px', alignItems:'center'}}>
+                            <select 
+                              className="filter-input" 
+                              style={{width:'120px', marginBottom: 0}}
+                              value={editingSup.coordenador} 
+                              onChange={(e) => setEditingSup({...editingSup, coordenador: e.target.value})}
+                            >
+                              <option value="">Sem Coord.</option>
+                              {coordenadores.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            </select>
+                            <button className="action-btn active" onClick={(e) => {
+                              e.stopPropagation();
+                              setSupervisoresOverrides({...supervisoresOverrides, [u.id]: { ...supervisoresOverrides[u.id], coordenador: editingSup.coordenador }});
+                              setEditingSup(null);
+                            }}>Salvar</button>
+                            <button className="action-btn" onClick={(e) => { e.stopPropagation(); setEditingSup(null); }}>Cancelar</button>
+                          </div>
+                        ) : (
+                          <div style={{display:'flex', gap:'8px'}}>
+                            <button className="action-btn" onClick={(e) => { e.stopPropagation(); setEditingSup({ id: u.id, coordenador: u.coordenador || '' }); }}>✎ Editar</button>
+                            <button className="action-btn" style={{color:'var(--danger)', borderColor:'var(--danger)'}} onClick={(e) => { e.stopPropagation(); handleDeleteSup(u.id); }}>Excluir</button>
+                          </div>
+                        )}
                       </div>
                       
                       {expandedSupId === u.id && (
@@ -467,7 +531,7 @@ function App() {
 
         {/* Modal Coordenadores */}
         {showCoordModal && (
-          <div style={modalOverlayStyle}>
+          <div style={modalOverlayStyle} onClick={(e) => e.target === e.currentTarget && setShowCoordModal(false)}>
             <div className="glass-panel" style={{...modalContentStyle, width: '400px'}}>
               <h2 style={{color: 'var(--primary-blue)', marginBottom: '16px'}}>Coordenadores</h2>
               
