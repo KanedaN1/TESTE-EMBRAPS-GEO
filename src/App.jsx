@@ -11,8 +11,6 @@ import './index.css';
 import { useFirestoreSync } from './services/useFirestoreSync';
 
 const defaultCoordenadores = [
-
-const defaultCoordenadores = [
   { id: 1, name: 'Coordenador 1' },
   { id: 2, name: 'Coordenador 2' },
   { id: 3, name: 'Coordenador 3' },
