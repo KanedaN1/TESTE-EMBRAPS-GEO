@@ -19,9 +19,11 @@ export default function Header({ currentMonth, setCurrentMonth, kpis, pluviomete
 
   return (
     <div className="header glass-panel animate-fade-in">
-      <div className="header-title" style={{ display: 'flex', alignItems: 'center' }}>
+      <div className="header-title" style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
         <img src={logo} alt="Embraps Geo Logo" style={{ height: '70px', objectFit: 'contain' }} />
-        <span style={{ marginLeft: '15px', fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-main)' }}>G.E.O</span>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start', paddingLeft: '50px' }}>
+          <span style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--primary-blue)', letterSpacing: '2px' }}>G.E.O</span>
+        </div>
       </div>
       
       <div className="header-controls">
