@@ -8,12 +8,9 @@ import { postos as mockPostos, getDadosMensais, getTopOcorrencias, supervisors a
 import { fetchWeather, fetchContelePlaces, fetchConteleUsers, geocodeAddress, getTomTomRoute } from './services/apiServices';
 import './index.css';
 
-// Helpers para LocalStorage
-const loadLocal = (key, defaultVal) => {
-  const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : defaultVal;
-};
-const saveLocal = (key, data) => localStorage.setItem(key, JSON.stringify(data));
+import { useFirestoreSync } from './services/useFirestoreSync';
+
+const defaultCoordenadores = [
 
 const defaultCoordenadores = [
   { id: 1, name: 'Coordenador 1' },
@@ -35,14 +32,39 @@ function App() {
   const [conteleData, setConteleData] = useState([]);
   const [conteleUsers, setConteleUsers] = useState([]);
   
-  // Estados Persistentes
-  const [customPostos, setCustomPostos] = useState(() => loadLocal('customPostos', []));
-  const [postosOverrides, setPostosOverrides] = useState(() => loadLocal('postosOverrides', {}));
-  const [customSupervisores, setCustomSupervisores] = useState(() => loadLocal('customSupervisores', []));
-  const [supervisoresOverrides, setSupervisoresOverrides] = useState(() => loadLocal('supervisoresOverrides', {}));
-  const [deletedSupervisores, setDeletedSupervisores] = useState(() => loadLocal('deletedSupervisores', []));
-  const [coordenadores, setCoordenadores] = useState(() => loadLocal('coordenadores', defaultCoordenadores));
-  const [globalKpis, setGlobalKpis] = useState(() => loadLocal('globalKpis', { faltas: 0, demissoes: 0, posVenda: 0 }));
+  // Estados Persistentes (Firestore)
+  const [customPostos, setCustomPostos] = useFirestoreSync('customPostos', []);
+  const [postosOverrides, setPostosOverrides] = useFirestoreSync('postosOverrides', {});
+  const [customSupervisores, setCustomSupervisores] = useFirestoreSync('customSupervisores', []);
+  const [supervisoresOverrides, setSupervisoresOverrides] = useFirestoreSync('supervisoresOverrides', {});
+  const [deletedSupervisores, setDeletedSupervisores] = useFirestoreSync('deletedSupervisores', []);
+  const [coordenadores, setCoordenadores] = useFirestoreSync('coordenadores', defaultCoordenadores);
+  const [globalKpis, setGlobalKpis] = useFirestoreSync('globalKpis', { faltas: 0, demissoes: 0, posVenda: 0 });
+
+  // Modo TV
+  const [isTvMode, setIsTvMode] = useState(false);
+
+  const toggleTvMode = async () => {
+    if (!document.fullscreenElement) {
+      try {
+        await document.documentElement.requestFullscreen();
+        setIsTvMode(true);
+      } catch (err) {
+        console.error("Erro ao entrar em tela cheia", err);
+      }
+    } else {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+        setIsTvMode(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsTvMode(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
   
   const [tomTomRouteCoords, setTomTomRouteCoords] = useState(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
@@ -103,14 +125,7 @@ function App() {
     initData();
   }, []);
 
-  // Sync LocalStorage
-  useEffect(() => saveLocal('customPostos', customPostos), [customPostos]);
-  useEffect(() => saveLocal('postosOverrides', postosOverrides), [postosOverrides]);
-  useEffect(() => saveLocal('customSupervisores', customSupervisores), [customSupervisores]);
-  useEffect(() => saveLocal('supervisoresOverrides', supervisoresOverrides), [supervisoresOverrides]);
-  useEffect(() => saveLocal('deletedSupervisores', deletedSupervisores), [deletedSupervisores]);
-  useEffect(() => saveLocal('coordenadores', coordenadores), [coordenadores]);
-  useEffect(() => saveLocal('globalKpis', globalKpis), [globalKpis]);
+  // Removido useEffects de saveLocal (agora tratado pelo useFirestoreSync)
 
   const allSupervisores = useMemo(() => {
     const base = conteleUsers.length > 0 ? conteleUsers : mockSupervisors;
@@ -311,23 +326,26 @@ function App() {
 
   return (
     <>
-      <div className="app-container no-print">
+      <div className={`app-container no-print ${isTvMode ? 'tv-mode' : ''}`}>
         <div className="main-content">
-          <Header currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} kpis={kpis} pluviometer={pluviometer} globalKpis={globalKpis} setGlobalKpis={setGlobalKpis} />
+          {!isTvMode && <Header currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} kpis={kpis} pluviometer={pluviometer} globalKpis={globalKpis} setGlobalKpis={setGlobalKpis} />}
           
-          <Filters 
-            onFilterChange={setFilters}
-            heatmapActive={heatmapActive}
-            onToggleHeatmap={() => setHeatmapActive(!heatmapActive)}
-            routeActive={routeActive}
-            onToggleSupervisorRoute={handleToggleRoute}
-            onSimulateTraffic={() => setTrafficActive(!trafficActive)}
-            onAddPosto={() => setShowPostosModal(true)}
-            onOpenSupervisors={() => setShowSupModal(true)}
-            onPrint={printEscalas}
-            supervisores={allSupervisores}
-            loadingRoute={loadingRoute}
-          />
+          {!isTvMode && (
+            <Filters 
+              onFilterChange={setFilters}
+              heatmapActive={heatmapActive}
+              onToggleHeatmap={() => setHeatmapActive(!heatmapActive)}
+              routeActive={routeActive}
+              onToggleSupervisorRoute={handleToggleRoute}
+              onSimulateTraffic={() => setTrafficActive(!trafficActive)}
+              onAddPosto={() => setShowPostosModal(true)}
+              onOpenSupervisors={() => setShowSupModal(true)}
+              onPrint={printEscalas}
+              supervisores={allSupervisores}
+              loadingRoute={loadingRoute}
+              onToggleTvMode={toggleTvMode}
+            />
+          )}
           
           <MapComponent 
             postos={filteredPostos.filter(p => !p.isDeleted)} 
@@ -336,11 +354,20 @@ function App() {
             tomTomRouteCoords={tomTomRouteCoords}
             trafficActive={trafficActive}
             weatherActive={weatherActive}
-            onEditPosto={openEditPosto}
+            onEditPosto={!isTvMode ? openEditPosto : null} // Disable edit in TV mode
           />
+
+          {isTvMode && (
+            <button 
+              onClick={toggleTvMode} 
+              style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 9999, padding: '10px 20px', borderRadius: '30px', background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', cursor: 'pointer', backdropFilter: 'blur(10px)' }}
+            >
+              Sair da Tela Cheia (ESC)
+            </button>
+          )}
         </div>
 
-        <SidebarChat contextData={{ currentMonth, kpis, postos: enrichedPostos }} />
+        {!isTvMode && <SidebarChat contextData={{ currentMonth, kpis, postos: enrichedPostos }} />}
 
         {/* Modal Postos (Listagem Geral) */}
         {showPostosModal && (

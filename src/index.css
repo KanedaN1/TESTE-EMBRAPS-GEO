@@ -76,6 +76,19 @@ body {
   position: relative;
 }
 
+.app-container.tv-mode {
+  padding: 0;
+  gap: 0;
+}
+
+.app-container.tv-mode .main-content {
+  gap: 0;
+}
+
+.app-container.tv-mode .map-container {
+  border-radius: 0;
+}
+
 /* Header */
 .header {
   display: flex;

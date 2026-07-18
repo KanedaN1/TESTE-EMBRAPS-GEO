@@ -12,7 +12,8 @@ export default function Filters({
   onOpenSupervisors,
   onPrint,
   supervisores = [],
-  loadingRoute = false
+  loadingRoute = false,
+  onToggleTvMode
 }) {
   const [filterState, setFilterState] = useState({
     nome: '',
@@ -99,6 +100,9 @@ export default function Filters({
         </button>
         <button className="action-btn" onClick={onPrint} title="Imprimir escalas em PDF/A4">
           <Printer size={16} /> Imprimir
+        </button>
+        <button className="action-btn active" onClick={onToggleTvMode} title="Entrar no Modo Tela Cheia (TV)">
+          📺 Modo TV
         </button>
       </div>
 
