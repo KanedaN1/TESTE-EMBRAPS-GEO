@@ -138,7 +138,7 @@ INSTRUÇÕES DE COMPORTAMENTO:
 
     // Chamada usando o proxy do Vite para evitar problemas de CORS
     const response = await fetch(
-      `/api-gemini/v1beta/models/gemini-flash-latest:generateContent?key=${geminiApiKey}`,
+      `/api-gemini/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -146,7 +146,11 @@ INSTRUÇÕES DE COMPORTAMENTO:
       }
     );
     
-    if (!response.ok) throw new Error(`Erro API Gemini: ${response.status}`);
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Detalhe do erro Gemini:', errText);
+      throw new Error(`Erro API Gemini: ${response.status}`);
+    }
     
     const data = await response.json();
     return data.candidates[0].content.parts[0].text;
