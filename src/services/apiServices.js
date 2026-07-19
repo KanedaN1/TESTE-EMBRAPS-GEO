@@ -130,6 +130,7 @@ O usuário pediu ou o sistema disparou o seguinte alerta/comando:
 "${command}"
 
 INSTRUÇÕES DE COMPORTAMENTO:
+- NUNCA invente postos. Se um posto não estiver no contexto, não fale sobre ele.
 - Se for sobre clima/chuva, alerte sobre os postos com comporta. Avalie se as chuvas previstas podem afetar a operação.
 - Se for sobre trânsito, cite o 'transito' do contexto e sugira atenção para os supervisores ativos.
 - Seja direto e proativo. Máximo de 2 a 3 parágrafos curtos.
@@ -201,7 +202,7 @@ export const fetchTomTomIncidents = async () => {
   try {
     // Bounding box para a Baixada Santista aproximada
     const bbox = "-46.6,-24.1,-46.1,-23.8";
-    const response = await axios.get(`https://api.tomtom.com/traffic/services/5/incidentDetails?key=${TOMTOM_API_KEY}&bbox=${bbox}&fields={incidents{type,geometry{type,coordinates},properties{iconCategory,magnitudeOfDelay,events{description,code}}}}&language=pt-BR`);
+    const response = await axios.get(`https://api.tomtom.com/traffic/services/5/incidentDetails?key=${TOMTOM_API_KEY}&bbox=${bbox}&fields={incidents{type,geometry{type,coordinates},properties{iconCategory,magnitudeOfDelay,events{description,code}}}}`);
     
     if (response.data && response.data.incidents) {
       const incidents = response.data.incidents;

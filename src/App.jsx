@@ -225,8 +225,8 @@ function App() {
     if (routeActive) { setRouteActive(false); setTomTomRouteCoords(null); setTomTomRouteSummary(null); return; }
     setLoadingRoute(true);
     
-    // Ponto de partida fixo: Embraps Macuco
-    const startPoint = { lat: -23.9608, lng: -46.3336 }; 
+    // Ponto de partida fixo: Embraps Macuco (Praça Cel. Fernando Prestes, 18)
+    const startPoint = { lat: -23.9643, lng: -46.3118 }; 
     const points = [startPoint, ...filteredPostos.map(p => ({ lat: p.lat, lng: p.lng }))];
     
     if (points.length > 1) {
