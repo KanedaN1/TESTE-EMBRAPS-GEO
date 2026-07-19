@@ -18,21 +18,21 @@ export default function Header({ currentMonth, setCurrentMonth, kpis, pluviomete
   };
 
   return (
-    <div className="header glass-panel animate-fade-in" style={{ position: 'relative' }}>
+    <div className="header glass-panel animate-fade-in" style={{ position: 'relative', padding: '10px 20px' }}>
       <div className="header-title" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <img src={logo} alt="Embraps Geo Logo" style={{ height: '95px', objectFit: 'contain' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <img src={logo} alt="Embraps Geo Logo" style={{ height: '80px', objectFit: 'contain' }} />
           <span style={{ 
-            background: 'var(--primary-blue)', color: 'white', 
-            fontSize: '0.7rem', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'nowrap'
+            color: 'var(--primary-blue)', 
+            fontSize: '0.65rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '-8px'
           }}>
             Versão Alfa
           </span>
         </div>
         <a 
           href="https://embraps-coe-dashboard.vercel.app/index.html" 
-          className="action-btn active"
-          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 15px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+          className="action-btn"
+          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px', fontSize: '0.8rem', whiteSpace: 'nowrap', background: 'transparent', color: 'var(--primary-blue)', border: '1px solid var(--primary-blue)' }}
           title="Voltar ao Painel COE"
         >
           ⬅️ Dashboard Principal
