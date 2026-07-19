@@ -20,12 +20,11 @@ export default function Header({ currentMonth, setCurrentMonth, kpis, pluviomete
   return (
     <div className="header glass-panel animate-fade-in" style={{ position: 'relative' }}>
       <div className="header-title" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-        <div style={{ position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src={logo} alt="Embraps Geo Logo" style={{ height: '95px', objectFit: 'contain' }} />
           <span style={{ 
-            position: 'absolute', bottom: '10px', right: '-30px', 
             background: 'var(--primary-blue)', color: 'white', 
-            fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', textTransform: 'uppercase' 
+            fontSize: '0.7rem', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'nowrap'
           }}>
             Versão Alfa
           </span>
@@ -33,10 +32,10 @@ export default function Header({ currentMonth, setCurrentMonth, kpis, pluviomete
         <a 
           href="https://embraps-coe-dashboard.vercel.app/index.html" 
           className="action-btn active"
-          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontSize: '0.9rem' }}
+          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 15px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
           title="Voltar ao Painel COE"
         >
-          ⬅️ Voltar ao Dashboard Principal
+          ⬅️ Dashboard Principal
         </a>
       </div>
       
