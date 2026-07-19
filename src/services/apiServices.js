@@ -85,7 +85,7 @@ export const fetchConteleUsers = async () => {
 
 export const fetchWeather = async (lat = -23.9608, lng = -46.3336) => {
   try {
-    const response = await axios.get(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=precipitation,rain&timezone=America%2FSao_Paulo`);
+    const response = await axios.get(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=precipitation,rain&daily=weather_code,precipitation_probability_max,precipitation_sum&timezone=America%2FSao_Paulo`);
     return response.data;
   } catch (error) {
     console.error('Erro ao buscar clima:', error);
@@ -95,36 +95,63 @@ export const fetchWeather = async (lat = -23.9608, lng = -46.3336) => {
 
 export const processAICommand = async (command, contextData) => {
   try {
-    const prompt = `Você é um assistente de IA focado no dashboard geoespacial "Embraps Geo".
-Os dados atuais do sistema são:
-${JSON.stringify(contextData).substring(0, 1500)} // Truncado para limite
+    const { kpis, postos, currentMonth, pluviometer, weatherForecast, trafficData, supervisoresAtivos } = contextData;
+    
+    // Preparar resumo para economizar tokens
+    const postosAlerta = postos ? postos.filter(p => p.status === 'Alerta' || p.status === 'Clima').map(p => ({ nome: p.nome, supervisor: p.supervisorDiurno, status: p.status })) : [];
+    const postosComporta = postos ? postos.filter(p => p.comporta).map(p => ({ nome: p.nome, supervisor: p.supervisorDiurno })) : [];
+    
+    const compactContext = {
+      mes: currentMonth,
+      clima: {
+        chuva_agora_mm: pluviometer,
+        previsao_amanha: weatherForecast ? {
+          probabilidade_chuva: weatherForecast.daily?.precipitation_probability_max?.[1],
+          volume_chuva_mm: weatherForecast.daily?.precipitation_sum?.[1]
+        } : null
+      },
+      transito: trafficData || "Sem incidentes relatados no momento.",
+      gestao: {
+        total_postos: kpis?.totalPostos || 0,
+        supervisores_ativos: supervisoresAtivos || [],
+        postos_em_alerta_ou_clima: postosAlerta,
+        postos_com_comporta: postosComporta
+      }
+    };
 
-O usuário pediu o seguinte: "${command}"
-Responda de forma clara, profissional, focada em segurança e operação. Máx 3 parágrafos.`;
+    const prompt = `Você é o Analista operacional IA da Embraps Geo, um dashboard geoespacial focado em gestão de equipes, clima e trânsito na Baixada Santista.
+Sua missão é dar respostas curtas, precisas e em português do Brasil, focadas em segurança, operação e logística.
+Não liste todos os postos de uma vez, seja conciso.
+
+CONTEXTO ATUAL DO SISTEMA:
+${JSON.stringify(compactContext)}
+
+O usuário pediu ou o sistema disparou o seguinte alerta/comando:
+"${command}"
+
+INSTRUÇÕES DE COMPORTAMENTO:
+- Se for sobre clima/chuva, alerte sobre os postos com comporta. Avalie se as chuvas previstas podem afetar a operação.
+- Se for sobre trânsito, cite o 'transito' do contexto e sugira atenção para os supervisores ativos.
+- Seja direto e proativo. Máximo de 2 a 3 parágrafos curtos.
+`;
 
     // Chamada usando o proxy do Vite para evitar problemas de CORS
     const response = await fetch(
       `/api-gemini/v1beta/models/gemini-flash-latest:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       }
     );
     
-    if (!response.ok) {
-      throw new Error(`Erro na API Gemini: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`Erro API Gemini: ${response.status}`);
     
     const data = await response.json();
     return data.candidates[0].content.parts[0].text;
   } catch (error) {
     console.error('Erro na IA:', error);
-    return 'Desculpe, ocorreu um erro ao processar o comando via IA (Falha de Comunicação ou CORS).';
+    return 'Desculpe, ocorreu um erro ao processar o comando via IA.';
   }
 };
 
@@ -158,12 +185,39 @@ export const getTomTomRoute = async (points) => {
   try {
     const response = await axios.get(`https://api.tomtom.com/routing/1/calculateRoute/${waypoints}/json?key=${TOMTOM_API_KEY}&routeType=fastest&traffic=true&travelMode=car`);
     if (response.data && response.data.routes && response.data.routes.length > 0) {
-      const routePoints = response.data.routes[0].legs.flatMap(leg => leg.points.map(p => [p.latitude, p.longitude]));
-      return routePoints;
+      const route = response.data.routes[0];
+      const routePoints = route.legs.flatMap(leg => leg.points.map(p => [p.latitude, p.longitude]));
+      const summary = route.summary; // travelTimeInSeconds, trafficDelayInSeconds
+      return { routePoints, summary };
     }
     return null;
   } catch (error) {
     console.error('Erro ao calcular rota no TomTom:', error);
     return null;
+  }
+};
+
+export const fetchTomTomIncidents = async () => {
+  try {
+    // Bounding box para a Baixada Santista aproximada
+    const bbox = "-46.6,-24.1,-46.1,-23.8";
+    const response = await axios.get(`https://api.tomtom.com/traffic/services/5/incidentDetails?key=${TOMTOM_API_KEY}&bbox=${bbox}&fields={incidents{type,geometry{type,coordinates},properties{iconCategory,magnitudeOfDelay,events{description,code}}}}&language=pt-BR`);
+    
+    if (response.data && response.data.incidents) {
+      const incidents = response.data.incidents;
+      if (incidents.length === 0) return "Sem incidentes graves detectados na Baixada Santista.";
+      
+      const severos = incidents.filter(i => i.properties.magnitudeOfDelay >= 2).slice(0, 5); // delay moderado/severo
+      if (severos.length === 0) return "Trânsito fluindo normalmente, apenas ocorrências menores.";
+      
+      return severos.map(i => {
+        const desc = i.properties.events[0]?.description || 'Incidente de trânsito';
+        return `- ${desc} (Atraso de nível ${i.properties.magnitudeOfDelay})`;
+      }).join('\n');
+    }
+    return "Não foi possível obter os dados de trânsito.";
+  } catch (error) {
+    console.error('Erro ao buscar incidentes no TomTom:', error);
+    return "Erro ao comunicar com a API de trânsito.";
   }
 };

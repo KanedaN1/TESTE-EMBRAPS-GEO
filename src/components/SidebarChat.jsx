@@ -4,7 +4,7 @@ import { processAICommand } from '../services/apiServices';
 
 export default function SidebarChat({ contextData }) {
   const [messages, setMessages] = useState([
-    { id: 1, type: 'ai', text: 'Olá! Sou a IA do Embraps Geo. Monitoro postos, clima e trânsito. Como posso ajudar?' }
+    { id: 1, type: 'ai', text: 'Olá! Sou o Analista operacional IA. Monitoro postos, clima e trânsito. Como posso ajudar?' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,33 +20,68 @@ export default function SidebarChat({ contextData }) {
     contextRef.current = contextData;
   }, [contextData]);
 
-  // Alerta Automático a cada 2 horas (e um inicial em 15s para demonstração)
+  // Automações da IA
   useEffect(() => {
-    const checkWeather = async () => {
+    // 1. Alerta Automático a cada 2 horas (Clima amanhã / Mudanças)
+    const checkWeatherInterval = async () => {
       try {
-        const aiResponse = await processAICommand(
-          'Analise a previsão do tempo para as próximas 24h na Baixada Santista e faça um alerta rápido recomendando verificar os postos com comporta se houver chuva.', 
-          contextRef.current
-        );
-        const msg = {
-          id: Date.now(),
-          type: 'ai',
-          text: `⚠️ Alerta Automático (Clima 2h): ${aiResponse}`
-        };
-        setMessages(prev => [...prev, msg]);
-      } catch(e) {
-        console.error(e);
-      }
+        const aiResponse = await processAICommand('Analise a previsão do tempo para amanhã e hoje. Informe mudanças rápidas ou tempestades. Indique também de forma breve quais regiões da baixada santista seriam mais afetadas.', contextRef.current);
+        setMessages(prev => [...prev, { id: Date.now(), type: 'ai', text: `🌤️ Atualização de Clima (2h):\n${aiResponse}` }]);
+      } catch(e) { console.error(e); }
     };
 
-    const initialTimer = setTimeout(checkWeather, 15000); // Demo inicial
-    const interval = setInterval(checkWeather, 7200000); // 2 horas
+    // 2. Alerta Automático a cada 3 horas (Trânsito TomTom)
+    const checkTrafficInterval = async () => {
+      try {
+        const aiResponse = await processAICommand('Verifique os incidentes de trânsito atuais e informe se há engarrafamentos ou trânsito alto na cidade.', contextRef.current);
+        setMessages(prev => [...prev, { id: Date.now(), type: 'ai', text: `🚗 Atualização de Trânsito (3h):\n${aiResponse}` }]);
+      } catch(e) { console.error(e); }
+    };
+
+    const wTimer = setInterval(checkWeatherInterval, 7200000); // 2 horas
+    const tTimer = setInterval(checkTrafficInterval, 10800000); // 3 horas
 
     return () => {
-      clearTimeout(initialTimer);
-      clearInterval(interval);
+      clearInterval(wTimer);
+      clearInterval(tTimer);
     };
   }, []);
+
+  // 3. Sensor de Chuva em Tempo Real (Dispara quando pluviômetro > 0)
+  const prevRainRef = useRef(0);
+  useEffect(() => {
+    if (contextData?.pluviometer > 0 && prevRainRef.current === 0) {
+      const triggerRainAlert = async () => {
+        try {
+          const aiResponse = await processAICommand('O sensor pluviométrico acabou de identificar chuva. Informe o clima e alerte os postos específicos que possuem comporta para terem atenção.', contextRef.current);
+          setMessages(prev => [...prev, { id: Date.now(), type: 'ai', text: `🌧️ ALERTA DE CHUVA:\n${aiResponse}` }]);
+        } catch(e) { console.error(e); }
+      };
+      triggerRainAlert();
+    }
+    if (contextData?.pluviometer !== undefined) {
+      prevRainRef.current = contextData.pluviometer;
+    }
+  }, [contextData?.pluviometer]);
+
+  // 4. Acionamento do Botão de Rota Inteligente
+  const prevRouteRef = useRef(false);
+  useEffect(() => {
+    if (contextData?.routeActive && !prevRouteRef.current) {
+      const triggerRouteAlert = async () => {
+        try {
+          const delay = contextData.routeSummary?.trafficDelayInSeconds || 0;
+          let extraInfo = delay > 0 ? `A rota tem um atraso estimado de ${Math.round(delay/60)} minutos devido ao trânsito.` : 'A rota parece fluir bem, sem grandes atrasos.';
+          const aiResponse = await processAICommand(`Uma Rota Inteligente com partida da Embraps acabou de ser acionada para os postos do supervisor selecionado. ${extraInfo} Sugira se o supervisor deve ter atenção a engarrafamentos ou postos problemáticos no caminho.`, contextRef.current);
+          setMessages(prev => [...prev, { id: Date.now(), type: 'ai', text: `📍 ROTA ACIONADA:\n${aiResponse}` }]);
+        } catch(e) { console.error(e); }
+      };
+      triggerRouteAlert();
+    }
+    if (contextData?.routeActive !== undefined) {
+      prevRouteRef.current = contextData.routeActive;
+    }
+  }, [contextData?.routeActive, contextData?.routeSummary]);
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -70,7 +105,7 @@ export default function SidebarChat({ contextData }) {
   return (
     <div className="sidebar glass-panel animate-fade-in" style={{ animationDelay: '0.2s' }}>
       <div className="sidebar-title">
-        <Bot size={24} color="var(--primary-blue)" /> IA Embraps
+        <Bot size={24} color="var(--primary-blue)" /> Analista operacional IA
       </div>
 
       <div className="chat-window">

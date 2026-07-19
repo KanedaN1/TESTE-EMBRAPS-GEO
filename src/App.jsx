@@ -65,7 +65,10 @@ function App() {
   }, []);
   
   const [tomTomRouteCoords, setTomTomRouteCoords] = useState(null);
+  const [tomTomRouteSummary, setTomTomRouteSummary] = useState(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
+  const [weatherForecast, setWeatherForecast] = useState(null);
+  const [trafficData, setTrafficData] = useState(null);
 
   // Modals
   const [showPostosModal, setShowPostosModal] = useState(false);
@@ -100,13 +103,21 @@ function App() {
   useEffect(() => {
     const initData = async () => {
       const data = await fetchWeather();
-      if (data && data.current && data.current.precipitation !== undefined) {
-        setPluviometer(data.current.precipitation);
-        if (data.current.precipitation > 0) setWeatherActive(true);
+      if (data) {
+        setWeatherForecast(data);
+        if (data.current && data.current.precipitation !== undefined) {
+          setPluviometer(data.current.precipitation);
+          if (data.current.precipitation > 0) setWeatherActive(true);
+        }
       } else {
         setWeatherActive(true); 
         setPluviometer(12.5);
       }
+
+      // Fetch traffic data for AI context
+      import('./services/apiServices').then(({ fetchTomTomIncidents }) => {
+        fetchTomTomIncidents().then(incidents => setTrafficData(incidents));
+      });
 
       const [placesResponse, usersResponse] = await Promise.all([
         fetchContelePlaces(),
@@ -211,15 +222,20 @@ function App() {
   }, [enrichedPostos.length, globalKpis]);
 
   const handleToggleRoute = async () => {
-    if (routeActive) { setRouteActive(false); setTomTomRouteCoords(null); return; }
+    if (routeActive) { setRouteActive(false); setTomTomRouteCoords(null); setTomTomRouteSummary(null); return; }
     setLoadingRoute(true);
-    const embrapsCoord = await geocodeAddress("Praça Cel. Fernando Prestes, 18 - Macuco, Santos - SP");
-    const startPoint = embrapsCoord || { lat: -23.9608, lng: -46.3336 }; 
+    
+    // Ponto de partida fixo: Embraps Macuco
+    const startPoint = { lat: -23.9608, lng: -46.3336 }; 
     const points = [startPoint, ...filteredPostos.map(p => ({ lat: p.lat, lng: p.lng }))];
     
     if (points.length > 1) {
-      const route = await getTomTomRoute(points.slice(0, 150));
-      if (route) { setTomTomRouteCoords(route); setRouteActive(true); }
+      const result = await getTomTomRoute(points.slice(0, 150));
+      if (result) { 
+        setTomTomRouteCoords(result.routePoints); 
+        setTomTomRouteSummary(result.summary);
+        setRouteActive(true); 
+      }
       else alert("Falha na rota TomTom. Verifique API.");
     } else alert("Nenhum posto filtrado.");
     setLoadingRoute(false);
@@ -356,16 +372,42 @@ function App() {
           />
 
           {isTvMode && (
-            <button 
-              onClick={toggleTvMode} 
-              style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 9999, padding: '10px 20px', borderRadius: '30px', background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', cursor: 'pointer', backdropFilter: 'blur(10px)' }}
-            >
-              Sair da Tela Cheia (ESC)
-            </button>
+            <>
+              <div style={{
+                position: 'absolute', top: '20px', left: '20px', zIndex: 9999, 
+                padding: '15px 25px', borderRadius: '12px', 
+                background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(10px)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.4)',
+                display: 'flex', flexDirection: 'column', gap: '8px'
+              }}>
+                <div style={{fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary-blue)'}}>
+                  📍 Total de Postos: {kpis.totalPostos}
+                </div>
+                <div style={{fontSize: '1.1rem', color: pluviometer > 0 ? 'var(--primary-blue)' : 'var(--text-dark)'}}>
+                  🌧️ Pluviômetro: {pluviometer} mm
+                </div>
+              </div>
+              <button 
+                onClick={toggleTvMode} 
+                style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 9999, padding: '10px 20px', borderRadius: '30px', background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', cursor: 'pointer', backdropFilter: 'blur(10px)' }}
+              >
+                Sair da Tela Cheia (ESC)
+              </button>
+            </>
           )}
         </div>
 
-        {!isTvMode && <SidebarChat contextData={{ currentMonth, kpis, postos: enrichedPostos }} />}
+        {!isTvMode && <SidebarChat contextData={{ 
+          currentMonth, 
+          kpis, 
+          postos: enrichedPostos, 
+          pluviometer, 
+          weatherForecast, 
+          trafficData, 
+          supervisoresAtivos: allSupervisores.map(s => s.name),
+          routeActive,
+          routeSummary: tomTomRouteSummary
+        }} />}
 
         {/* Modal Postos (Listagem Geral) */}
         {showPostosModal && (
