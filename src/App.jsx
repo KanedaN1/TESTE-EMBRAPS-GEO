@@ -154,7 +154,7 @@ function App() {
   }, [conteleUsers, customSupervisores, supervisoresOverrides, deletedSupervisores]);
 
   const enrichedPostos = useMemo(() => {
-    const basePostos = conteleData.length > 0 ? [...mockPostos, ...conteleData.filter(c => c.lat && c.lng).map(c => ({
+    const basePostos = conteleData.length > 0 ? conteleData.filter(c => c.lat && c.lng).map(c => ({
       id: c.id || Math.random(),
       nome: c.name || c.nome,
       bairro: c.address?.neighborhood || 'Desconhecido',
@@ -165,7 +165,7 @@ function App() {
       supervisorNoturno: 'Contele',
       comporta: false,
       telefone: ''
-    }))] : mockPostos;
+    })) : mockPostos;
 
     const allPostosBase = [...basePostos, ...customPostos];
     const monthlyData = getDadosMensais(currentMonth);
