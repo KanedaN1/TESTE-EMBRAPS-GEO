@@ -130,10 +130,13 @@ O usuário pediu ou o sistema disparou o seguinte alerta/comando:
 "${command}"
 
 INSTRUÇÕES DE COMPORTAMENTO:
-- NUNCA invente postos. Se um posto não estiver no contexto, não fale sobre ele.
-- Se for sobre clima/chuva, alerte sobre os postos com comporta. Avalie se as chuvas previstas podem afetar a operação.
-- Se for sobre trânsito, cite o 'transito' do contexto e sugira atenção para os supervisores ativos.
-- Seja direto e proativo. Máximo de 2 a 3 parágrafos curtos.
+- REGRA DE OURO: SE A LISTA DE "postos_com_comporta" OU "postos_em_alerta" ESTIVER VAZIA, NÃO CITE NENHUM NOME. NUNCA invente ou dê exemplos fictícios. Fale apenas dos nomes exatos que aparecem no JSON.
+- SEJA EXTREMAMENTE BREVE E OBJETIVO. Use no máximo 3 ou 4 linhas.
+- Formate a resposta usando marcadores, emojis e negrito para ficar bonito e fácil de ler no chat.
+- Exemplo de formato:
+🚦 **Trânsito:** [Situação do trânsito resumida]
+⚠️ **Atenção:** [Posto em alerta, se houver, senão não cite]
+🌧️ **Clima:** [Situação do clima e comportas]
 `;
 
     // Chamada usando o proxy do Vite para evitar problemas de CORS
