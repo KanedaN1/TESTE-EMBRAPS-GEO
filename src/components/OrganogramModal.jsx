@@ -3,6 +3,10 @@ import './OrganogramModal.css';
 
 export default function OrganogramModal({ coordenadores, supervisores, postos, onClose }) {
   const [hidePostos, setHidePostos] = useState(false);
+  const containerRef = React.useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
   // Helpers
   const getSupervisoresDoCoordenador = (coordNome) => {
     return supervisores.filter(s => s.coordenador === coordNome);
@@ -14,6 +18,28 @@ export default function OrganogramModal({ coordenadores, supervisores, postos, o
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    setStartX(e.pageX - containerRef.current.offsetLeft);
+    setScrollLeft(containerRef.current.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const x = e.pageX - containerRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5; // Velocidade da rolagem
+    containerRef.current.scrollLeft = scrollLeft - walk;
   };
 
   return (
@@ -36,7 +62,14 @@ export default function OrganogramModal({ coordenadores, supervisores, postos, o
           </div>
         </div>
 
-        <div className="organogram-container">
+        <div 
+          className="organogram-container" 
+          ref={containerRef}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+        >
           <div className="org-level org-root">
             <div className="org-box root-box">
               <h3>Diretoria de Operações</h3>
