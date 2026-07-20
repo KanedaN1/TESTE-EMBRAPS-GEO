@@ -21,6 +21,10 @@ function App() {
   const [currentMonth, setCurrentMonth] = useState('Julho');
   const [filters, setFilters] = useState({ nome: '', supervisor: '', bairro: '', status: '' });
   
+  const [selectedPostos, setSelectedPostos] = useState([]);
+  const [bulkSupD, setBulkSupD] = useState('');
+  const [bulkSupN, setBulkSupN] = useState('');
+  
   const [heatmapActive, setHeatmapActive] = useState(false);
   const [routeActive, setRouteActive] = useState(false);
   const [trafficActive, setTrafficActive] = useState(false);
@@ -94,6 +98,7 @@ function App() {
         setShowSupModal(false);
         setShowCoordModal(false);
         setShowOrganogramModal(false);
+        setSelectedPostos([]);
       }
     };
     window.addEventListener('keydown', handleEsc);
@@ -253,8 +258,8 @@ function App() {
         nome: editingPosto.nome || 'Novo Posto',
         bairro: editingPosto.address || 'Manual',
         lat, lng, turno: '24h',
-        supervisorDiurno: editingPosto.supervisor,
-        supervisorNoturno: editingPosto.supervisor,
+        supervisorDiurno: editingPosto.supervisorDiurno,
+        supervisorNoturno: editingPosto.supervisorNoturno,
         comporta: editingPosto.comporta,
         telefone: editingPosto.telefone,
         faltasMensais: parseInt(editingPosto.faltasMensais) || 0,
@@ -269,8 +274,8 @@ function App() {
       const overrides = {
         nome: editingPosto.nome,
         comporta: editingPosto.comporta,
-        supervisorDiurno: editingPosto.supervisor,
-        supervisorNoturno: editingPosto.supervisor,
+        supervisorDiurno: editingPosto.supervisorDiurno,
+        supervisorNoturno: editingPosto.supervisorNoturno,
         faltasMensais: parseInt(editingPosto.faltasMensais) || 0,
         demissoesMensais: parseInt(editingPosto.demissoesMensais) || 0,
         posVendaMensais: parseInt(editingPosto.posVendaMensais) || 0,
@@ -280,6 +285,22 @@ function App() {
       setPostosOverrides({ ...postosOverrides, [editingPosto.id]: overrides });
     }
     setShowEditPostoModal(false);
+  };
+
+  const handleBulkAssign = () => {
+    if (selectedPostos.length === 0) return;
+    const newOverrides = { ...postosOverrides };
+    selectedPostos.forEach(id => {
+      newOverrides[id] = {
+        ...(newOverrides[id] || {}),
+        supervisorDiurno: bulkSupD,
+        supervisorNoturno: bulkSupN
+      };
+    });
+    setPostosOverrides(newOverrides);
+    setSelectedPostos([]);
+    setBulkSupD('');
+    setBulkSupN('');
   };
 
   const handleDeletePosto = (id) => {
@@ -297,7 +318,8 @@ function App() {
       nome: posto.nome || '',
       address: posto.bairro || '',
       telefone: posto.telefone || '',
-      supervisor: posto.supervisorDiurno || '',
+      supervisorDiurno: posto.supervisorDiurno || '',
+      supervisorNoturno: posto.supervisorNoturno || '',
       comporta: posto.comporta || false,
       faltasMensais: posto.faltas !== undefined ? posto.faltas : 0,
       demissoesMensais: posto.demissoes !== undefined ? posto.demissoes : 0,
@@ -406,7 +428,8 @@ function App() {
           trafficData, 
           supervisoresAtivos: allSupervisores.map(s => s.name),
           routeActive,
-          routeSummary: tomTomRouteSummary
+          routeSummary: tomTomRouteSummary,
+          heatmapActive
         }} />}
 
         {/* Modal Postos (Listagem Geral) */}
@@ -420,17 +443,49 @@ function App() {
                 </div>
               </div>
 
-              <div style={{marginBottom: '16px'}}>
+              <div style={{marginBottom: '16px', display:'flex', gap:'8px', alignItems:'center'}}>
                 <select 
                   className="filter-input" 
-                  style={{width: '100%', marginBottom: '0'}} 
+                  style={{flex: 1, marginBottom: '0'}} 
                   value={postosModalFilterSup} 
                   onChange={(e) => setPostosModalFilterSup(e.target.value)}
                 >
                   <option value="">Todos os Supervisores</option>
                   {allSupervisores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                 </select>
+                <button className="action-btn" onClick={() => {
+                  const filteredIds = enrichedPostos
+                    .filter(p => !p.isDeleted)
+                    .filter(p => !postosModalFilterSup || p.supervisorDiurno === postosModalFilterSup || p.supervisorNoturno === postosModalFilterSup)
+                    .map(p => p.id);
+                  if (selectedPostos.length === filteredIds.length && filteredIds.length > 0) {
+                    setSelectedPostos([]);
+                  } else {
+                    setSelectedPostos(filteredIds);
+                  }
+                }}>
+                  {selectedPostos.length > 0 ? 'Desmarcar Todos' : 'Selecionar Visíveis'}
+                </button>
               </div>
+
+              {selectedPostos.length > 0 && (
+                <div style={{marginBottom: '16px', padding: '12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.3)'}}>
+                  <div style={{marginBottom: '8px', fontWeight: 'bold', color: 'var(--primary-blue)'}}>
+                    Atribuir {selectedPostos.length} postos selecionados:
+                  </div>
+                  <div style={{display:'flex', gap:'8px'}}>
+                    <select className="filter-input" style={{flex:1}} value={bulkSupD} onChange={e=>setBulkSupD(e.target.value)}>
+                      <option value="">(Manter Diurno)</option>
+                      {allSupervisores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                    </select>
+                    <select className="filter-input" style={{flex:1}} value={bulkSupN} onChange={e=>setBulkSupN(e.target.value)}>
+                      <option value="">(Manter Noturno)</option>
+                      {allSupervisores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                    </select>
+                    <button className="action-btn active" onClick={handleBulkAssign}>Aplicar</button>
+                  </div>
+                </div>
+              )}
 
               <div style={{overflowY: 'auto', flex: 1, paddingRight:'8px'}}>
                 {enrichedPostos
@@ -438,9 +493,20 @@ function App() {
                   .filter(p => !postosModalFilterSup || p.supervisorDiurno === postosModalFilterSup || p.supervisorNoturno === postosModalFilterSup)
                   .map(p => (
                   <div key={p.id} style={{padding:'8px', borderBottom:'1px solid rgba(0,0,0,0.1)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                    <div>
-                      <strong>{p.nome}</strong> <span style={{fontSize:'0.8rem', color:'gray'}}>- {p.bairro}</span>
-                      <div style={{fontSize:'0.8rem'}}>Sup: {p.supervisorDiurno} | Comporta: {p.comporta?'Sim':'Não'}</div>
+                    <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedPostos.includes(p.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedPostos([...selectedPostos, p.id]);
+                          else setSelectedPostos(selectedPostos.filter(id => id !== p.id));
+                        }}
+                        style={{width:'18px', height:'18px'}}
+                      />
+                      <div>
+                        <strong>{p.nome}</strong> <span style={{fontSize:'0.8rem', color:'gray'}}>- {p.bairro}</span>
+                        <div style={{fontSize:'0.8rem'}}>Sup. Dia: {p.supervisorDiurno || '-'} | Sup. Noite: {p.supervisorNoturno || '-'} | Comporta: {p.comporta?'Sim':'Não'}</div>
+                      </div>
                     </div>
                     <div style={{display:'flex', gap:'8px'}}>
                       <button className="action-btn" onClick={() => openEditPosto(p)}>Editar</button>
@@ -450,7 +516,7 @@ function App() {
                 ))}
               </div>
               <div style={{display:'flex', justifyContent:'flex-end', marginTop:'16px'}}>
-                <button className="action-btn" onClick={() => setShowPostosModal(false)}>Fechar</button>
+                <button className="action-btn" onClick={() => { setShowPostosModal(false); setSelectedPostos([]); }}>Fechar</button>
               </div>
             </div>
           </div>
@@ -472,11 +538,22 @@ function App() {
                 </>
               )}
               
-              <label className="form-label">Supervisor Responsável</label>
-              <select className="filter-input" style={inputStyle} value={editingPosto.supervisor} onChange={e => setEditingPosto({...editingPosto, supervisor: e.target.value})}>
-                <option value="">Nenhum</option>
-                {allSupervisores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-              </select>
+              <div style={{display:'flex', gap:'8px', marginBottom:'16px'}}>
+                <div style={{flex:1}}>
+                  <label className="form-label">Supervisor Diurno</label>
+                  <select className="filter-input" style={inputStyle} value={editingPosto.supervisorDiurno} onChange={e => setEditingPosto({...editingPosto, supervisorDiurno: e.target.value})}>
+                    <option value="">Nenhum</option>
+                    {allSupervisores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div style={{flex:1}}>
+                  <label className="form-label">Supervisor Noturno</label>
+                  <select className="filter-input" style={inputStyle} value={editingPosto.supervisorNoturno} onChange={e => setEditingPosto({...editingPosto, supervisorNoturno: e.target.value})}>
+                    <option value="">Nenhum</option>
+                    {allSupervisores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  </select>
+                </div>
+              </div>
 
               <label style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'16px', color:'var(--text-dark)'}}>
                 <input type="checkbox" checked={editingPosto.comporta} onChange={e => setEditingPosto({...editingPosto, comporta: e.target.checked})} />

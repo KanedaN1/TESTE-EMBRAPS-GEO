@@ -83,13 +83,48 @@ export default function SidebarChat({ contextData }) {
     }
   }, [contextData?.routeActive, contextData?.routeSummary]);
 
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!input.trim()) return;
+  // 5. Acionamento do Botão de Mapa de Calor
+  const prevHeatmapRef = useRef(false);
+  useEffect(() => {
+    if (contextData?.heatmapActive && !prevHeatmapRef.current) {
+      const triggerHeatmapAlert = async () => {
+        try {
+          const postosAlerta = (contextData.postos || []).filter(p => p.status === 'Alerta');
+          const bairrosCount = {};
+          postosAlerta.forEach(p => {
+            const bairro = p.bairro || 'Desconhecido';
+            bairrosCount[bairro] = (bairrosCount[bairro] || 0) + 1;
+          });
+          
+          let bairroMaisCritico = 'Nenhum';
+          let maxCount = 0;
+          for (const [bairro, count] of Object.entries(bairrosCount)) {
+            if (count > maxCount) {
+              maxCount = count;
+              bairroMaisCritico = bairro;
+            }
+          }
+          
+          const msg = `O mapa de calor acaba de ser ativado. Analise e informe que o bairro com maior concentração de postos em alerta é "${bairroMaisCritico}" com ${maxCount} posto(s) afetado(s). Dê dicas breves sobre ações para o supervisor dessa região.`;
+          const aiResponse = await processAICommand(msg, contextRef.current);
+          setMessages(prev => [...prev, { id: Date.now(), type: 'ai', text: `🔥 ANÁLISE DE CALOR:\n${aiResponse}` }]);
+        } catch(e) { console.error(e); }
+      };
+      triggerHeatmapAlert();
+    }
+    if (contextData?.heatmapActive !== undefined) {
+      prevHeatmapRef.current = contextData.heatmapActive;
+    }
+  }, [contextData?.heatmapActive, contextData?.postos]);
 
-    const userMsg = { id: Date.now(), type: 'user', text: input };
+  const handleSend = async (e, customInput = null) => {
+    if (e) e.preventDefault();
+    const textToSend = customInput || input;
+    if (!textToSend.trim()) return;
+
+    const userMsg = { id: Date.now(), type: 'user', text: textToSend };
     setMessages(prev => [...prev, userMsg]);
-    setInput('');
+    if (!customInput) setInput('');
     setLoading(true);
 
     try {
@@ -101,6 +136,12 @@ export default function SidebarChat({ contextData }) {
       setLoading(false);
     }
   };
+
+  const suggestions = [
+    "Resumo de alertas de hoje",
+    "Postos com mais faltas",
+    "Onde o trânsito está pior?"
+  ];
 
   return (
     <div className="sidebar glass-panel animate-fade-in" style={{ animationDelay: '0.2s' }}>
@@ -123,7 +164,20 @@ export default function SidebarChat({ contextData }) {
         <div ref={chatEndRef} />
       </div>
 
-      <form className="chat-input-container" onSubmit={handleSend}>
+      <div className="chat-suggestions">
+        {suggestions.map((sug, idx) => (
+          <button 
+            key={idx} 
+            className="chat-suggestion-chip" 
+            onClick={() => handleSend(null, sug)}
+            disabled={loading}
+          >
+            {sug}
+          </button>
+        ))}
+      </div>
+
+      <form className="chat-input-container" onSubmit={(e) => handleSend(e)}>
         <input 
           type="text" 
           placeholder="Ex: Cruzamento de trânsito..."
