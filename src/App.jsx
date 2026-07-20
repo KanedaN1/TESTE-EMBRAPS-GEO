@@ -362,7 +362,7 @@ function App() {
 
   return (
     <>
-      <div className={`app-container no-print ${isTvMode ? 'tv-mode' : ''}`}>
+      <div className={`app-container ${!showOrganogramModal ? 'no-print' : ''} ${isTvMode ? 'tv-mode' : ''}`}>
         <div className="main-content">
           {!isTvMode && <Header currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} kpis={kpis} pluviometer={pluviometer} globalKpis={globalKpis} setGlobalKpis={setGlobalKpis} />}
           
@@ -717,7 +717,7 @@ function App() {
         )}
       </div>
 
-      <div className="print-container print-only">
+      <div className={`print-container ${!showOrganogramModal ? 'print-only' : 'no-print'}`}>
         {/* Lógica de Impressão (Mantida) */}
         {allSupervisores.map(sup => {
           const supName = sup.name;
