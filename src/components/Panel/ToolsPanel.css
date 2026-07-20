@@ -1,0 +1,39 @@
+.tools-panel {
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  background-color: var(--color-primary);
+  border-right: 1px solid var(--color-border);
+  z-index: 9;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.panel-section {
+  margin-bottom: 24px;
+}
+
+.panel-title {
+  font-size: 0.85rem;
+  color: #94A3B8;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  font-family: 'Fira Sans', sans-serif;
+  letter-spacing: 0.5px;
+}
+
+.filters-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.actions-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.actions-group .btn {
+  justify-content: flex-start;
+}

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './OrganogramModal.css';
 
 export default function OrganogramModal({ coordenadores, supervisores, postos, onClose }) {
+  const [hidePostos, setHidePostos] = useState(false);
   // Helpers
   const getSupervisoresDoCoordenador = (coordNome) => {
     return supervisores.filter(s => s.coordenador === coordNome);
@@ -11,12 +12,28 @@ export default function OrganogramModal({ coordenadores, supervisores, postos, o
     return postos.filter(p => p.supervisorDiurno === supNome || p.supervisorNoturno === supNome);
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="organogram-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="glass-panel organogram-modal-content">
-        <div className="modal-header" style={{display:'flex', justifyContent:'space-between', marginBottom:'20px'}}>
-          <h2 style={{color: 'var(--primary-blue)'}}>Organograma Operacional</h2>
-          <button className="action-btn" onClick={onClose}>Fechar</button>
+        <div className="modal-header" style={{display:'flex', justifyContent:'space-between', marginBottom:'20px', alignItems:'center'}}>
+          <h2 style={{color: 'var(--primary-blue)', margin: 0}}>Organograma Operacional</h2>
+          <div className="modal-actions" style={{display:'flex', gap:'16px', alignItems:'center'}}>
+            <label style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', color:'var(--text-dark)', fontWeight:'bold'}}>
+              <input 
+                type="checkbox" 
+                checked={hidePostos} 
+                onChange={(e) => setHidePostos(e.target.checked)} 
+                style={{width: '18px', height: '18px'}}
+              />
+              Esconder Postos
+            </label>
+            <button className="action-btn print-btn" onClick={handlePrint}>🖨️ Imprimir (A4)</button>
+            <button className="action-btn" onClick={onClose}>Fechar</button>
+          </div>
         </div>
 
         <div className="organogram-container">
@@ -54,7 +71,7 @@ export default function OrganogramModal({ coordenadores, supervisores, postos, o
                                 <span className="org-role">Supervisor</span>
                               </div>
                               
-                              {postosSup.length > 0 && (
+                              {postosSup.length > 0 && !hidePostos && (
                                 <>
                                   <div className="org-lines-down-small" />
                                   <div className="org-level postos-level">

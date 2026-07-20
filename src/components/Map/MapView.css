@@ -1,0 +1,24 @@
+.map-wrapper {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+
+/* Fix leaflet default icon issues in React if needed */
+.leaflet-popup-content-wrapper {
+  border-radius: 8px;
+}
+
+.leaflet-popup-content {
+  margin: 12px;
+  font-family: 'Inter', sans-serif;
+}
+
+.popup-details p {
+  margin-bottom: 4px;
+  font-size: 0.9rem;
+}
+
+.popup-details strong {
+  color: var(--primary-color);
+}

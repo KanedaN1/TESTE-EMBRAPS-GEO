@@ -1,0 +1,80 @@
+.sidebar-chat {
+  width: 350px;
+  background-color: var(--color-primary);
+  border-left: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+}
+
+.chat-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-on-primary);
+  font-weight: 600;
+  font-family: 'Fira Code', monospace;
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.message {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.message.user {
+  align-self: flex-end;
+  background-color: var(--color-accent);
+  color: var(--color-primary);
+  border-bottom-right-radius: 0;
+  font-weight: 500;
+}
+
+.message.ai {
+  align-self: flex-start;
+  background-color: var(--color-secondary);
+  color: var(--color-foreground);
+  border-bottom-left-radius: 0;
+}
+
+.message.system {
+  align-self: center;
+  background-color: #3b2a00;
+  color: #F59E0B;
+  border: 1px solid #785a00;
+  width: 100%;
+  text-align: center;
+  font-size: 0.8rem;
+  border-radius: 4px;
+}
+
+.chat-input-container {
+  padding: 16px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  gap: 8px;
+  background-color: var(--color-primary);
+}
+
+.chat-input-container input {
+  flex: 1;
+}
+
+.chat-input-container .btn {
+  padding: 8px 12px;
+}
