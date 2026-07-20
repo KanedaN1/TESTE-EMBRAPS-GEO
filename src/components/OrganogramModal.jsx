@@ -70,16 +70,17 @@ export default function OrganogramModal({ coordenadores, supervisores, postos, o
           onMouseUp={handleMouseUp}
           onMouseMove={handleMouseMove}
         >
-          <div className="org-level org-root">
-            <div className="org-box root-box">
-              <h3>Diretoria de Operações</h3>
+          <div className="org-tree-wrapper">
+            <div className="org-level org-root">
+              <div className="org-box root-box">
+                <h3>Diretoria de Operações</h3>
+              </div>
             </div>
-          </div>
 
-          <div className="org-lines-down" />
+            <div className="org-lines-down" />
 
-          {/* Nível Coordenadores */}
-          <div className="org-level coord-level" style={{display:'flex', justifyContent:'center', gap:'32px'}}>
+            {/* Nível Coordenadores */}
+            <div className="org-level coord-level" style={{display:'flex', justifyContent:'center', gap:'32px'}}>
             {coordenadores.map(coord => {
               const sups = getSupervisoresDoCoordenador(coord.name);
               return (
@@ -128,6 +129,7 @@ export default function OrganogramModal({ coordenadores, supervisores, postos, o
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
       </div>

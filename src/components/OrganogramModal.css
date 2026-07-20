@@ -28,12 +28,21 @@
 .organogram-container {
   display: flex;
   flex-direction: column;
-  align-items: center; 
+  align-items: flex-start; /* Evita o corte na esquerda quando a arvore é muito larga */
   padding: 20px;
   overflow: auto;
   width: 100%;
   flex: 1;
   cursor: grab;
+}
+
+.org-tree-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: max-content;
+  margin: auto; /* Centraliza verticalmente e horizontalmente se houver espaço */
+  padding: 0 40px; /* Garante respiro lateral quando rolar */
 }
 
 .organogram-container:active {
