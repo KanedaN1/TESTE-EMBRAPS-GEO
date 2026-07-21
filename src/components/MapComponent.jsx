@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat'; // Heatmap plugin
+import 'leaflet-polylinedecorator';
 
 // Fix default icons in React Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -59,6 +60,37 @@ function HeatmapLayer({ data, active }) {
   return null;
 }
 
+function PolylineDecorator({ positions }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!positions || positions.length < 2) return;
+
+    const polyline = L.polyline(positions, { color: 'var(--primary-blue)', weight: 4 }).addTo(map);
+    
+    const decorator = L.polylineDecorator(polyline, {
+      patterns: [
+        {
+          offset: 25,
+          repeat: 50,
+          symbol: L.Symbol.arrowHead({
+            pixelSize: 15,
+            polygon: false,
+            pathOptions: { stroke: true, weight: 3, color: 'var(--primary-blue)' }
+          })
+        }
+      ]
+    }).addTo(map);
+
+    return () => {
+      map.removeLayer(polyline);
+      map.removeLayer(decorator);
+    };
+  }, [map, positions]);
+
+  return null;
+}
+
 export default function MapComponent({ postos, heatmapActive, routeActive, tomTomRouteCoords, trafficActive, weatherActive, onEditPosto }) {
   const baixadaSantista = [-23.9608, -46.3336]; // Santos center
 
@@ -94,8 +126,8 @@ export default function MapComponent({ postos, heatmapActive, routeActive, tomTo
 
         <HeatmapLayer data={postos} active={heatmapActive} />
 
-        {routeActive && (
-          <Polyline positions={routePositions} color="var(--primary-blue)" weight={4} dashArray="10, 10" />
+        {routeActive && routePositions && routePositions.length > 0 && (
+          <PolylineDecorator positions={routePositions} />
         )}
 
         {postos.map(posto => {

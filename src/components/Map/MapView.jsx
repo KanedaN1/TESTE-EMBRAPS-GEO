@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
 import './MapView.css';
+import 'leaflet-polylinedecorator';
 
 // Fix for default marker icons missing in Leaflet + Webpack/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -22,6 +23,37 @@ const createCustomIcon = (colorClass) => {
     iconAnchor: [12, 12],
     popupAnchor: [0, -12]
   });
+};
+
+const PolylineDecorator = ({ positions }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!positions || positions.length < 2) return;
+
+    const polyline = L.polyline(positions, { color: '#0056b3', weight: 3 }).addTo(map);
+    
+    const decorator = L.polylineDecorator(polyline, {
+      patterns: [
+        {
+          offset: 25,
+          repeat: 50,
+          symbol: L.Symbol.arrowHead({
+            pixelSize: 15,
+            polygon: false,
+            pathOptions: { stroke: true, weight: 3, color: '#0056b3' }
+          })
+        }
+      ]
+    }).addTo(map);
+
+    return () => {
+      map.removeLayer(polyline);
+      map.removeLayer(decorator);
+    };
+  }, [map, positions]);
+
+  return null;
 };
 
 const iconGreen = createCustomIcon('marker-green');
@@ -89,7 +121,7 @@ export const MapView = ({
         {heatmapActive && <HeatmapLayer points={heatmapPoints} />}
 
         {routePoints.length > 1 && (
-          <Polyline positions={routePoints} color="#0056b3" weight={3} dashArray="5, 10" />
+          <PolylineDecorator positions={routePoints} />
         )}
 
         {traffic && traffic.map((inc, i) => (
