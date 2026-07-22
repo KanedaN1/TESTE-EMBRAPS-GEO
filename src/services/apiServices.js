@@ -133,13 +133,15 @@ INSTRUÇÕES DE COMPORTAMENTO:
 - REGRA DE OURO: SE A LISTA DE "postos_com_comporta" OU "postos_em_alerta" ESTIVER VAZIA, NÃO CITE NENHUM NOME. Fale apenas dos nomes exatos que aparecem no JSON.
 - SEJA EXTREMAMENTE BREVE E OBJETIVO. Não crie frases longas.
 - Formate a resposta usando OBRIGATORIAMENTE quebras de linha DUPLAS entre os tópicos para garantir o visual no chat.
-- O formato deve ser exato:
+- O formato deve seguir os tópicos que tiverem informações relevantes:
 
 🚦 **Trânsito:** [Situação resumida]
 
 ⚠️ **Atenção:** [Apenas postos em alerta se existirem]
 
 🌧️ **Clima:** [Situação do clima]
+
+🛡️ **Comportas:** [Se houver previsão de chuva ou alerta de chuva, liste OBRIGATORIAMENTE de forma ordenada, visual e com bullets todos os postos com comporta e seus supervisores]
 `;
 
     // Chamada usando o proxy do Vite para evitar problemas de CORS

@@ -25,7 +25,7 @@ export default function SidebarChat({ contextData }) {
     // 1. Alerta Automático a cada 2 horas (Clima amanhã / Mudanças)
     const checkWeatherInterval = async () => {
       try {
-        const aiResponse = await processAICommand('Analise a previsão do tempo para amanhã e hoje. Informe mudanças rápidas ou tempestades. Indique também de forma breve quais regiões da baixada santista seriam mais afetadas.', contextRef.current);
+        const aiResponse = await processAICommand('Analise a previsão do tempo para amanhã e hoje. Informe mudanças rápidas ou tempestades. Indique as regiões afetadas. Se houver previsão de chuva forte, liste OBRIGATORIAMENTE os postos com comporta de forma visual e ordenada para alertá-los antecipadamente.', contextRef.current);
         setMessages(prev => [...prev, { id: Date.now(), type: 'ai', text: `🌤️ Atualização de Clima (2h):\n${aiResponse}` }]);
       } catch(e) { console.error(e); }
     };
@@ -53,7 +53,7 @@ export default function SidebarChat({ contextData }) {
     if (contextData?.pluviometer > 0 && prevRainRef.current === 0) {
       const triggerRainAlert = async () => {
         try {
-          const aiResponse = await processAICommand('O sensor pluviométrico acabou de identificar chuva. Informe o clima e alerte os postos específicos que possuem comporta para terem atenção.', contextRef.current);
+          const aiResponse = await processAICommand('O sensor pluviométrico acabou de identificar chuva. Informe o clima atual e faça uma listagem visual e ordenada (com bullet points) de TODOS os postos que possuem comporta para alertá-los imediatamente.', contextRef.current);
           setMessages(prev => [...prev, { id: Date.now(), type: 'ai', text: `🌧️ ALERTA DE CHUVA:\n${aiResponse}` }]);
         } catch(e) { console.error(e); }
       };
@@ -138,8 +138,9 @@ export default function SidebarChat({ contextData }) {
   };
 
   const suggestions = [
+    "Como esta o clima agora?",
+    "Quais postos tem comporta?",
     "Resumo de alertas de hoje",
-    "Postos com mais faltas",
     "Onde o trânsito está pior?"
   ];
 
