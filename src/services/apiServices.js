@@ -30,7 +30,7 @@ export const fetchContelePlaces = async () => {
         const bairroStr = (p.address && p.address.neighborhood) ? p.address.neighborhood : (p.neighborhood || p.district || p.city || 'Desconhecido');
         
         return {
-          id: String(p.id || p.customId),
+          id: String(p.id || p.customId || p.name || p.corporateName || Math.random()),
           nome: p.name || p.corporateName || p.fantasyName || 'Posto Sem Nome',
           bairro: bairroStr,
           lat: parseFloat(latitude),
@@ -83,12 +83,27 @@ export const fetchConteleUsers = async () => {
   }
 };
 
-export const fetchWeather = async (lat = -23.9608, lng = -46.3336) => {
+export const fetchWeather = async () => {
   try {
-    const response = await axios.get(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=precipitation,rain&daily=weather_code,precipitation_probability_max,precipitation_sum&timezone=America%2FSao_Paulo`);
+    // Coordenadas da Baixada Santista: Santos, São Vicente, Guarujá, Cubatão, Praia Grande
+    const lats = '-23.9608,-23.966,-23.978,-23.887,-24.005';
+    const lngs = '-46.3336,-46.375,-46.185,-46.401,-46.412';
+    const response = await axios.get(`https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}&current=precipitation,rain&daily=weather_code,precipitation_probability_max,precipitation_sum&timezone=America%2FSao_Paulo`);
+    
+    if (Array.isArray(response.data)) {
+      const cityNames = ['Santos', 'São Vicente', 'Guarujá', 'Cubatão', 'Praia Grande'];
+      const citiesWeather = response.data.map((cData, idx) => ({
+        cidade: cityNames[idx],
+        precipitation: cData.current?.precipitation || 0,
+        rain: cData.current?.rain || 0
+      }));
+      const main = response.data[0];
+      main.cidades_baixada = citiesWeather;
+      return main;
+    }
     return response.data;
   } catch (error) {
-    console.error('Erro ao buscar clima:', error);
+    console.error('Erro ao buscar clima da Baixada Santista:', error);
     return null;
   }
 };
@@ -98,13 +113,21 @@ export const processAICommand = async (command, contextData) => {
     const { kpis, postos, currentMonth, pluviometer, weatherForecast, trafficData, supervisoresAtivos } = contextData;
     
     // Preparar resumo para economizar tokens
-    const postosAlerta = postos ? postos.filter(p => p.status === 'Alerta' || p.status === 'Clima').map(p => ({ nome: p.nome, supervisor: p.supervisorDiurno, status: p.status })) : [];
-    const postosComporta = postos ? postos.filter(p => p.comporta).map(p => ({ nome: p.nome, supervisor: p.supervisorDiurno })) : [];
+    const postosAlerta = postos ? postos.filter(p => (p.status === 'Alerta' || p.status === 'Clima') && !p.isDeleted).map(p => ({ nome: p.nome, bairro_ou_cidade: p.bairro, supervisor: p.supervisorDiurno, status: p.status })) : [];
+    const postosComporta = postos ? postos.filter(p => p.comporta && !p.isDeleted).map(p => ({ nome: p.nome, bairro_ou_cidade: p.bairro, supervisor: p.supervisorDiurno })) : [];
     
     const compactContext = {
+      regiao: "Baixada Santista (SP)",
       mes: currentMonth,
-      clima: {
+      clima_baixada_santista: {
         chuva_agora_mm: pluviometer,
+        cidades_monitoradas: weatherForecast?.cidades_baixada || [
+          { cidade: 'Santos', precipitation: pluviometer },
+          { cidade: 'São Vicente', precipitation: pluviometer },
+          { cidade: 'Guarujá', precipitation: pluviometer },
+          { cidade: 'Cubatão', precipitation: pluviometer },
+          { cidade: 'Praia Grande', precipitation: pluviometer }
+        ],
         previsao_amanha: weatherForecast ? {
           probabilidade_chuva: weatherForecast.daily?.precipitation_probability_max?.[1],
           volume_chuva_mm: weatherForecast.daily?.precipitation_sum?.[1]
@@ -130,7 +153,9 @@ O usuário pediu ou o sistema disparou o seguinte alerta/comando:
 "${command}"
 
 INSTRUÇÕES DE COMPORTAMENTO:
-- REGRA DE OURO: SE A LISTA DE "postos_com_comporta" OU "postos_em_alerta" ESTIVER VAZIA, NÃO CITE NENHUM NOME. Fale apenas dos nomes exatos que aparecem no JSON.
+- ANÁLISE REGIONAL: Toda a análise de clima é estritamente focada na região da Baixada Santista (Santos, São Vicente, Guarujá, Cubatão, Praia Grande, etc).
+- ALERTAS POR CIDADE/BAIRRO: Se a pergunta ou o alerta de chuva referir-se a uma cidade/bairro específico (ex: São Vicente), MENCIONE EXPLICITAMENTE A CIDADE/BAIRRO E LISTE OS POSTOS COM COMPORTA DESSA CIDADE/BAIRRO (Ex: "🌧️ Chuva na cidade de São Vicente: Cuidado com os postos de comporta localizados nesta cidade: ...").
+- SE A LISTA DE "postos_com_comporta" OU "postos_em_alerta" ESTIVER VAZIA, NÃO CITE NENHUM NOME. Fale apenas dos nomes exatos que aparecem no JSON.
 - SEJA EXTREMAMENTE BREVE E OBJETIVO. Não crie frases longas.
 - Formate a resposta usando OBRIGATORIAMENTE quebras de linha DUPLAS entre os tópicos para garantir o visual no chat.
 - O formato deve seguir os tópicos que tiverem informações relevantes:
@@ -139,9 +164,9 @@ INSTRUÇÕES DE COMPORTAMENTO:
 
 ⚠️ **Atenção:** [Apenas postos em alerta se existirem]
 
-🌧️ **Clima:** [Situação do clima]
+🌧️ **Clima:** [Situação do clima na Baixada Santista / Cidade específica]
 
-🛡️ **Comportas:** [Se houver previsão de chuva ou alerta de chuva, liste OBRIGATORIAMENTE de forma ordenada, visual e com bullets todos os postos com comporta e seus supervisores]
+🛡️ **Comportas:** [Se houver previsão de chuva ou alerta de chuva, liste OBRIGATORIAMENTE de forma ordenada, visual, indicando a cidade/bairro e os supervisores responsável]
 `;
 
     // Chamada usando o proxy do Vite para evitar problemas de CORS

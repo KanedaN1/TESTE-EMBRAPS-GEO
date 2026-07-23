@@ -89,6 +89,7 @@ function App() {
   const [editingCoord, setEditingCoord] = useState(null); // {id, name}
   const [editingSup, setEditingSup] = useState(null); // {id, coordenador}
   const [postosModalFilterSup, setPostosModalFilterSup] = useState('');
+  const [postosModalFilterComporta, setPostosModalFilterComporta] = useState(false);
 
   useEffect(() => {
     const handleEsc = (e) => {
@@ -160,16 +161,17 @@ function App() {
 
   const enrichedPostos = useMemo(() => {
     const basePostos = conteleData.length > 0 ? conteleData.filter(c => c.lat && c.lng).map(c => ({
-      id: c.id || Math.random(),
-      nome: c.name || c.nome,
-      bairro: c.address?.neighborhood || 'Desconhecido',
+      ...c,
+      id: String(c.id || c.nome || Math.random()),
+      nome: c.nome || c.name || 'Posto Sem Nome',
+      bairro: c.bairro || c.address?.neighborhood || 'Desconhecido',
       lat: c.lat,
       lng: c.lng,
-      turno: '24h',
-      supervisorDiurno: 'Contele',
-      supervisorNoturno: 'Contele',
-      comporta: false,
-      telefone: ''
+      turno: c.turno || '24h',
+      supervisorDiurno: c.supervisorDiurno || 'Contele',
+      supervisorNoturno: c.supervisorNoturno || 'Contele',
+      comporta: c.comporta || false,
+      telefone: c.telefone || ''
     })) : mockPostos;
 
     const allPostosBase = [...basePostos, ...customPostos];
@@ -179,17 +181,20 @@ function App() {
     const seteDias = 7 * 24 * 60 * 60 * 1000;
 
     return allPostosBase.map(posto => {
-      const override = postosOverrides[posto.id] || {};
+      const targetIdStr = String(posto.id);
+      const override = postosOverrides[posto.id] || postosOverrides[targetIdStr] || {};
       const merged = { ...posto, ...override };
 
-      const mockData = monthlyData.find(d => d.postoId === merged.id) || { faltas: 0, demissoes: 0, posVenda: 0 };
+      const mockData = monthlyData.find(d => String(d.postoId) === targetIdStr) || { faltas: 0, demissoes: 0, posVenda: 0 };
       
       merged.faltas = merged.faltasMensais !== undefined ? merged.faltasMensais : mockData.faltas;
       merged.demissoes = merged.demissoesMensais !== undefined ? merged.demissoesMensais : mockData.demissoes;
       merged.posVenda = merged.posVendaMensais !== undefined ? merged.posVendaMensais : mockData.posVenda;
       
       let status = 'Operacional'; // Verde
-      let isAlerta = topOccurrences.topFaltas.includes(merged.id) || topOccurrences.topDemissoes.includes(merged.id) || merged.posVenda > 0;
+      let isAlerta = topOccurrences.topFaltas.some(id => String(id) === targetIdStr) || 
+                     topOccurrences.topDemissoes.some(id => String(id) === targetIdStr) || 
+                     merged.posVenda > 0;
       
       if (merged.alertaManual) {
          if (now - merged.alertaData <= seteDias) {
@@ -205,26 +210,28 @@ function App() {
   }, [currentMonth, weatherActive, conteleData, customPostos, postosOverrides]);
 
   const filteredPostos = useMemo(() => {
-    return enrichedPostos.filter(p => {
-      const matchNome = p.nome.toLowerCase().includes(filters.nome.toLowerCase());
-      const supD = p.supervisorDiurno || '';
-      const supN = p.supervisorNoturno || '';
-      const matchSup = supD.toLowerCase().includes(filters.supervisor.toLowerCase()) || 
-                       supN.toLowerCase().includes(filters.supervisor.toLowerCase());
-      const matchBairro = p.bairro.toLowerCase().includes(filters.bairro.toLowerCase());
-      const matchStatus = filters.status ? p.status === filters.status : true;
-      return matchNome && matchSup && matchBairro && matchStatus;
-    });
+    return enrichedPostos
+      .filter(p => !p.isDeleted)
+      .filter(p => {
+        const matchNome = (p.nome || '').toLowerCase().includes(filters.nome.toLowerCase());
+        const supD = p.supervisorDiurno || '';
+        const supN = p.supervisorNoturno || '';
+        const matchSup = supD.toLowerCase().includes(filters.supervisor.toLowerCase()) || 
+                         supN.toLowerCase().includes(filters.supervisor.toLowerCase());
+        const matchBairro = (p.bairro || '').toLowerCase().includes(filters.bairro.toLowerCase());
+        const matchStatus = filters.status ? p.status === filters.status : true;
+        return matchNome && matchSup && matchBairro && matchStatus;
+      });
   }, [enrichedPostos, filters]);
 
   const kpis = useMemo(() => {
     return { 
-      totalPostos: enrichedPostos.length, 
+      totalPostos: enrichedPostos.filter(p => !p.isDeleted).length, 
       faltas: globalKpis.faltas, 
       demissoes: globalKpis.demissoes, 
       posVenda: globalKpis.posVenda 
     };
-  }, [enrichedPostos.length, globalKpis]);
+  }, [enrichedPostos, globalKpis]);
 
   const handleToggleRoute = async () => {
     if (routeActive) { setRouteActive(false); setTomTomRouteCoords(null); setTomTomRouteSummary(null); return; }
@@ -304,9 +311,14 @@ function App() {
   };
 
   const handleDeletePosto = (id) => {
-    if (window.confirm("Deseja ocultar/excluir este posto?")) {
-      setCustomPostos(customPostos.filter(p => p.id !== id));
-      setPostosOverrides({ ...postosOverrides, [id]: { isDeleted: true } });
+    if (window.confirm("Deseja realmente excluir este posto?")) {
+      const targetIdStr = String(id);
+      setCustomPostos(prevCustom => (prevCustom || []).filter(p => String(p.id) !== targetIdStr));
+      setPostosOverrides(prevOverrides => ({
+        ...(prevOverrides || {}),
+        [targetIdStr]: { ...((prevOverrides || {})[targetIdStr] || {}), isDeleted: true }
+      }));
+      setSelectedPostos(prev => (prev || []).filter(pId => String(pId) !== targetIdStr));
     }
   };
 
@@ -409,6 +421,35 @@ function App() {
                   🌧️ Pluviômetro: {pluviometer} mm
                 </div>
               </div>
+              <div style={{
+                position: 'absolute', bottom: '24px', left: '24px', zIndex: 9999,
+                padding: '14px 20px', borderRadius: '14px',
+                background: 'rgba(255, 255, 255, 0.82)', backdropFilter: 'blur(12px)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.18)', border: '1px solid rgba(255, 255, 255, 0.5)',
+                display: 'flex', flexDirection: 'column', gap: '8px',
+                minWidth: '240px', fontSize: '0.85rem', color: '#1e293b',
+                pointerEvents: 'none'
+              }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--primary-blue)', borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '4px', marginBottom: '2px' }}>
+                  Legenda dos Postos
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: 'var(--success)', display: 'inline-block', boxShadow: '0 0 6px rgba(16, 185, 129, 0.6)' }}></span>
+                  <span><strong>Verde:</strong> Posto operacional</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: 'var(--danger)', display: 'inline-block', boxShadow: '0 0 8px rgba(239, 68, 68, 0.7)' }}></span>
+                  <span><strong>Vermelho:</strong> Posto com Ocorrência</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: 'var(--secondary-blue)', display: 'inline-block', boxShadow: '0 0 8px rgba(59, 130, 246, 0.7)' }}></span>
+                  <span><strong>Azul:</strong> Posto com comporta acionada</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ color: 'var(--primary-blue)', fontWeight: 'bold', fontSize: '1rem', lineHeight: 1 }}>➔➔</span>
+                  <span><strong>Setas de trânsito:</strong> Engarrafamento</span>
+                </div>
+              </div>
               <button 
                 onClick={toggleTvMode} 
                 style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 9999, padding: '10px 20px', borderRadius: '30px', background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', cursor: 'pointer', backdropFilter: 'blur(10px)' }}
@@ -443,20 +484,46 @@ function App() {
                 </div>
               </div>
 
-              <div style={{marginBottom: '16px', display:'flex', gap:'8px', alignItems:'center'}}>
+              <div style={{marginBottom: '16px', display:'flex', gap:'12px', alignItems:'center', flexWrap:'wrap'}}>
                 <select 
                   className="filter-input" 
-                  style={{flex: 1, marginBottom: '0'}} 
+                  style={{flex: 1, minWidth: '180px', marginBottom: '0'}} 
                   value={postosModalFilterSup} 
                   onChange={(e) => setPostosModalFilterSup(e.target.value)}
                 >
                   <option value="">Todos os Supervisores</option>
                   {allSupervisores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                 </select>
+
+                <label style={{
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  cursor: 'pointer', 
+                  fontSize: '0.9rem', 
+                  color: 'var(--text-dark)', 
+                  fontWeight: '600',
+                  userSelect: 'none',
+                  background: postosModalFilterComporta ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${postosModalFilterComporta ? 'var(--secondary-blue)' : 'rgba(0,0,0,0.15)'}`,
+                  transition: 'all 0.2s ease'
+                }}>
+                  <input 
+                    type="checkbox" 
+                    checked={postosModalFilterComporta} 
+                    onChange={(e) => setPostosModalFilterComporta(e.target.checked)} 
+                    style={{width: '16px', height: '16px', cursor: 'pointer'}}
+                  />
+                  <span>🌊 Comporta</span>
+                </label>
+
                 <button className="action-btn" onClick={() => {
                   const filteredIds = enrichedPostos
                     .filter(p => !p.isDeleted)
                     .filter(p => !postosModalFilterSup || p.supervisorDiurno === postosModalFilterSup || p.supervisorNoturno === postosModalFilterSup)
+                    .filter(p => !postosModalFilterComporta || p.comporta)
                     .map(p => p.id);
                   if (selectedPostos.length === filteredIds.length && filteredIds.length > 0) {
                     setSelectedPostos([]);
@@ -491,6 +558,7 @@ function App() {
                 {enrichedPostos
                   .filter(p => !p.isDeleted)
                   .filter(p => !postosModalFilterSup || p.supervisorDiurno === postosModalFilterSup || p.supervisorNoturno === postosModalFilterSup)
+                  .filter(p => !postosModalFilterComporta || p.comporta)
                   .map(p => (
                   <div key={p.id} style={{padding:'8px', borderBottom:'1px solid rgba(0,0,0,0.1)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                     <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
@@ -583,9 +651,25 @@ function App() {
                 </div>
               </div>
 
-              <div style={{display:'flex', gap:'8px', justifyContent:'flex-end'}}>
-                <button className="action-btn" onClick={() => setShowEditPostoModal(false)}>Cancelar</button>
-                <button className="action-btn active" onClick={handleSavePosto}>Salvar</button>
+              <div style={{display:'flex', gap:'8px', justifyContent:'space-between', alignItems:'center'}}>
+                <div>
+                  {!editingPosto.isNew && (
+                    <button 
+                      className="action-btn" 
+                      style={{color:'var(--danger)', borderColor:'var(--danger)'}} 
+                      onClick={() => {
+                        handleDeletePosto(editingPosto.id);
+                        setShowEditPostoModal(false);
+                      }}
+                    >
+                      🗑️ Excluir Posto
+                    </button>
+                  )}
+                </div>
+                <div style={{display:'flex', gap:'8px'}}>
+                  <button className="action-btn" onClick={() => setShowEditPostoModal(false)}>Cancelar</button>
+                  <button className="action-btn active" onClick={handleSavePosto}>Salvar</button>
+                </div>
               </div>
             </div>
           </div>

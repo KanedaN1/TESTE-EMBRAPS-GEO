@@ -33,15 +33,15 @@ export function useFirestoreSync(docId, defaultValue) {
 
   // Função para salvar novos dados
   const saveData = async (newValue) => {
-    // Atualiza localmente para resposta rápida (optimistic UI)
-    setData(newValue);
-    // Salva no Firestore
-    const docRef = doc(db, 'geoData', docId);
-    try {
-      await setDoc(docRef, { value: newValue });
-    } catch (error) {
-      console.error(`Erro ao salvar ${docId}:`, error);
-    }
+    setData((prev) => {
+      const updated = typeof newValue === 'function' ? newValue(prev) : newValue;
+      // Salva no Firestore
+      const docRef = doc(db, 'geoData', docId);
+      setDoc(docRef, { value: updated }).catch((error) => {
+        console.error(`Erro ao salvar ${docId}:`, error);
+      });
+      return updated;
+    });
   };
 
   return [data, saveData, loading];

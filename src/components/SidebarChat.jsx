@@ -1,14 +1,102 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, Send, User } from 'lucide-react';
+import { Bot, Send, User, Volume2, VolumeX } from 'lucide-react';
 import { processAICommand } from '../services/apiServices';
 
 export default function SidebarChat({ contextData }) {
   const [messages, setMessages] = useState([
-    { id: 1, type: 'ai', text: 'Olá! Sou o Analista operacional IA. Monitoro postos, clima e trânsito. Como posso ajudar?' }
+    { id: 1, type: 'ai', text: 'Olá! Sou o Analista operacional IA. Monitoro postos, clima e trânsito na Baixada Santista. Como posso ajudar?' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const chatEndRef = useRef(null);
+
+  const isMutedRef = useRef(isMuted);
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  const audioRef = useRef(null);
+  const audioTimerRef = useRef(null);
+
+  // Função para tocar o som de radar (bloop) por até 13 segundos
+  const playRadarSound = () => {
+    if (isMutedRef.current) return;
+
+    if (audioTimerRef.current) {
+      clearTimeout(audioTimerRef.current);
+      audioTimerRef.current = null;
+    }
+
+    try {
+      if (!audioRef.current) {
+        audioRef.current = new Audio('/radar.mp3');
+      }
+      const audio = audioRef.current;
+      audio.currentTime = 0;
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          // Limita a reprodução a 13 segundos exatamente
+          audioTimerRef.current = setTimeout(() => {
+            audio.pause();
+            audio.currentTime = 0;
+          }, 13000);
+        }).catch(() => {
+          // Fallback para som sintetizado se radar.mp3 ainda não foi colocado na pasta public
+          playSynthRadarBloop();
+        });
+      }
+    } catch (e) {
+      playSynthRadarBloop();
+    }
+  };
+
+  // Som sintetizado de radar (bloop) via Web Audio API caso o arquivo MP3 não exista
+  const playSynthRadarBloop = () => {
+    if (isMutedRef.current) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+
+      let bloopCount = 0;
+      const intervalId = setInterval(() => {
+        if (bloopCount >= 6 || isMutedRef.current) {
+          clearInterval(intervalId);
+          try { ctx.close(); } catch(e){}
+          return;
+        }
+        bloopCount++;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.25);
+      }, 2000);
+
+      audioTimerRef.current = setTimeout(() => {
+        clearInterval(intervalId);
+        try { ctx.close(); } catch(e){}
+      }, 13000);
+    } catch (e) {}
+  };
+
+  const checkAndTriggerSound = (text) => {
+    if (!text) return;
+    const lower = text.toLowerCase();
+    if (lower.includes('comporta') || lower.includes('alerta de chuva') || lower.includes('chuva')) {
+      playRadarSound();
+    }
+  };
 
   // Auto-scroll
   useEffect(() => {
@@ -25,15 +113,16 @@ export default function SidebarChat({ contextData }) {
     // 1. Alerta Automático a cada 2 horas (Clima amanhã / Mudanças)
     const checkWeatherInterval = async () => {
       try {
-        const aiResponse = await processAICommand('Analise a previsão do tempo para amanhã e hoje. Informe mudanças rápidas ou tempestades. Indique as regiões afetadas. Se houver previsão de chuva forte, liste OBRIGATORIAMENTE os postos com comporta de forma visual e ordenada para alertá-los antecipadamente.', contextRef.current);
+        const aiResponse = await processAICommand('Analise a previsão do tempo para amanhã e hoje na Baixada Santista. Informe mudanças rápidas ou tempestades. Indique as cidades/regiões afetadas. Se houver previsão de chuva forte, liste OBRIGATORIAMENTE os postos com comporta agrupando por cidade/bairro para alertá-los antecipadamente.', contextRef.current);
         setMessages(prev => [...prev, { id: Date.now(), type: 'ai', text: `🌤️ Atualização de Clima (2h):\n${aiResponse}` }]);
+        checkAndTriggerSound(aiResponse);
       } catch(e) { console.error(e); }
     };
 
     // 2. Alerta Automático a cada 3 horas (Trânsito TomTom)
     const checkTrafficInterval = async () => {
       try {
-        const aiResponse = await processAICommand('Verifique os incidentes de trânsito atuais e informe se há engarrafamentos ou trânsito alto na cidade.', contextRef.current);
+        const aiResponse = await processAICommand('Verifique os incidentes de trânsito atuais e informe se há engarrafamentos ou trânsito alto nas cidades da Baixada Santista.', contextRef.current);
         setMessages(prev => [...prev, { id: Date.now(), type: 'ai', text: `🚗 Atualização de Trânsito (3h):\n${aiResponse}` }]);
       } catch(e) { console.error(e); }
     };
@@ -53,8 +142,9 @@ export default function SidebarChat({ contextData }) {
     if (contextData?.pluviometer > 0 && prevRainRef.current === 0) {
       const triggerRainAlert = async () => {
         try {
-          const aiResponse = await processAICommand('O sensor pluviométrico acabou de identificar chuva. Informe o clima atual e faça uma listagem visual e ordenada (com bullet points) de TODOS os postos que possuem comporta para alertá-los imediatamente.', contextRef.current);
-          setMessages(prev => [...prev, { id: Date.now(), type: 'ai', text: `🌧️ ALERTA DE CHUVA:\n${aiResponse}` }]);
+          const aiResponse = await processAICommand('O sensor pluviométrico acabou de identificar chuva na Baixada Santista. Informe o clima atual e faça uma listagem visual e ordenada (com bullet points) por cidade/bairro de TODOS os postos que possuem comporta para alertá-los imediatamente.', contextRef.current);
+          setMessages(prev => [...prev, { id: Date.now(), type: 'ai', text: `🌧️ ALERTA DE CHUVA NA BAIXADA SANTISTA:\n${aiResponse}` }]);
+          playRadarSound();
         } catch(e) { console.error(e); }
       };
       triggerRainAlert();
@@ -130,6 +220,7 @@ export default function SidebarChat({ contextData }) {
     try {
       const aiResponse = await processAICommand(userMsg.text, contextData);
       setMessages(prev => [...prev, { id: Date.now()+1, type: 'ai', text: aiResponse }]);
+      checkAndTriggerSound(aiResponse);
     } catch (err) {
       setMessages(prev => [...prev, { id: Date.now()+1, type: 'ai', text: 'Erro ao processar comunicação com Gemini API.' }]);
     } finally {
@@ -138,16 +229,40 @@ export default function SidebarChat({ contextData }) {
   };
 
   const suggestions = [
-    "Como esta o clima agora?",
-    "Quais postos tem comporta?",
+    "Como esta o clima na Baixada Santista?",
+    "Quais postos tem comporta por cidade?",
     "Resumo de alertas de hoje",
     "Onde o trânsito está pior?"
   ];
 
   return (
     <div className="sidebar glass-panel animate-fade-in" style={{ animationDelay: '0.2s' }}>
-      <div className="sidebar-title">
-        <Bot size={24} color="var(--primary-blue)" /> Analista operacional IA
+      <div className="sidebar-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Bot size={24} color="var(--primary-blue)" /> Analista operacional IA
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsMuted(!isMuted)}
+          title={isMuted ? "Som Mudo (clique para ativar som de radar)" : "Som Ativo (clique para silenciar)"}
+          style={{
+            background: isMuted ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+            border: `1px solid ${isMuted ? 'var(--danger)' : 'var(--success)'}`,
+            color: isMuted ? 'var(--danger)' : 'var(--success)',
+            borderRadius: '20px',
+            padding: '4px 10px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            fontSize: '0.78rem',
+            fontWeight: '600',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+          <span>{isMuted ? 'Mudo' : 'Som On'}</span>
+        </button>
       </div>
 
       <div className="chat-window">
